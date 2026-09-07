@@ -94,6 +94,17 @@ export class BillingController {
     return this.billing.issueInvoice(tenantId, id);
   }
 
+  /** Exporta la factura al ERP (US3.5). Idempotente. */
+  @Post('invoices/:id/export')
+  exportInvoice(@CurrentTenant() tenantId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.billing.exportInvoice(tenantId, id);
+  }
+
+  @Get('invoices/:id/export')
+  getInvoiceExport(@CurrentTenant() tenantId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.billing.getInvoiceExport(tenantId, id);
+  }
+
   // --- Conciliación de facturas de carrier (US3.4) ---
 
   @Post('carrier-invoices')

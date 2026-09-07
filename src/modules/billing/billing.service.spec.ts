@@ -10,12 +10,19 @@ function build() {
   const rateCards = { findOne: jest.fn(), find: jest.fn(), update: jest.fn() };
   const rateRules = { find: jest.fn() };
   const charges = { save: jest.fn().mockImplementation((c) => Promise.resolve({ id: 'ch1', ...c })) };
-  const invoices = {};
-  const invoiceLines = {};
+  const invoices = { findOne: jest.fn() };
+  const invoiceLines = { find: jest.fn() };
   const costs = { find: jest.fn() };
   const carrierInvoices = { find: jest.fn(), findOne: jest.fn() };
   const carrierInvoiceLines = { find: jest.fn() };
+  const invoiceExports = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn().mockImplementation((r) => Promise.resolve({ id: 'exp1', ...r })),
+  };
   const operations = { get: jest.fn() };
+  const events = { publish: jest.fn().mockResolvedValue(undefined) };
+  const erp = { export: jest.fn() };
   const dataSource: { transaction?: jest.Mock } = {};
 
   const service = new BillingService(
@@ -27,7 +34,10 @@ function build() {
     costs as never,
     carrierInvoices as never,
     carrierInvoiceLines as never,
+    invoiceExports as never,
     operations as never,
+    events as never,
+    erp as never,
     dataSource as never,
   );
   return {
@@ -38,7 +48,12 @@ function build() {
     costs,
     carrierInvoices,
     carrierInvoiceLines,
+    invoiceExports,
+    invoices,
+    invoiceLines,
     operations,
+    events,
+    erp,
     dataSource,
   };
 }
@@ -154,5 +169,55 @@ describe('BillingService.reconcileCarrierInvoice', () => {
 
     expect(report.discrepancies).toBe(0);
     expect(invoice.status).toBe('reconciled');
+  });
+});
+
+describe('BillingService.exportInvoice', () => {
+  it('exporta una factura emitida y publica INVOICE_EXPORTED', async () => {
+    const { service, invoices, invoiceLines, invoiceExports, erp, events } = build();
+    invoices.findOne.mockResolvedValue({
+      id: 'inv1',
+      number: 'INV-000001',
+      clientId: 'c1',
+      currency: 'USD',
+      totalMinor: '51500',
+      issuedAt: new Date('2026-09-07T00:00:00Z'),
+      status: 'issued',
+    });
+    invoiceExports.findOne.mockResolvedValue(null); // sin export previo
+    invoiceLines.find.mockResolvedValue([
+      { description: 'Gestión', quantity: 1, rateMinor: '50000', amountMinor: '50000' },
+    ]);
+    erp.export.mockResolvedValue({ externalRef: 'ERP-abc' });
+
+    const rec = await service.exportInvoice(tenantId, 'inv1');
+
+    expect(erp.export).toHaveBeenCalledWith(
+      expect.objectContaining({ invoiceNumber: 'INV-000001', totalMinor: '51500' }),
+    );
+    expect(rec.status).toBe('exported');
+    expect(rec.externalRef).toBe('ERP-abc');
+    expect(events.publish).toHaveBeenCalled();
+  });
+
+  it('es idempotente: no re-exporta si ya hay una exportación exitosa', async () => {
+    const { service, invoices, invoiceExports, erp } = build();
+    invoices.findOne.mockResolvedValue({ id: 'inv1', status: 'issued' });
+    invoiceExports.findOne.mockResolvedValue({ id: 'exp-prev', status: 'exported', externalRef: 'ERP-x' });
+
+    const rec = await service.exportInvoice(tenantId, 'inv1');
+
+    expect(rec).toMatchObject({ id: 'exp-prev', externalRef: 'ERP-x' });
+    expect(erp.export).not.toHaveBeenCalled();
+  });
+
+  it('rechaza exportar una factura no emitida', async () => {
+    const { service, invoices, erp } = build();
+    invoices.findOne.mockResolvedValue({ id: 'inv1', status: 'draft' });
+
+    await expect(service.exportInvoice(tenantId, 'inv1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(erp.export).not.toHaveBeenCalled();
   });
 });

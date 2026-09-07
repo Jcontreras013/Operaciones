@@ -28,6 +28,12 @@ export enum InvoiceStatus {
   ISSUED = 'issued',
 }
 
+/** Resultado de un intento de exportación de factura al ERP (US3.5). */
+export enum InvoiceExportStatus {
+  EXPORTED = 'exported',
+  FAILED = 'failed',
+}
+
 /** Estado de una factura recibida de un carrier (US3.4). */
 export enum CarrierInvoiceStatus {
   /** Registrada, aún sin conciliar. */

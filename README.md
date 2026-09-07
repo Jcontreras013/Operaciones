@@ -97,6 +97,9 @@ documenta los dos esquemas de autenticación de la Fase 0: `x-tenant-id` (operad
   Incluye **conciliación de facturas de carrier** (US3.4): registrar la factura del proveedor
   y conciliarla contra los costos registrados (`reconciled`/`disputed` según variación y
   tolerancia), más el **margen por operación** (ingresos − costos) para verificar antes de facturar.
+  Y **export a ERP** (US3.5): un conector enchufable (puerto/adaptador) exporta la factura
+  emitida y registra el intento (idempotente); la Fase 0 trae un `StubErpConnector` que se
+  sustituye por un adaptador real sin tocar el servicio de facturación.
 - **Torre de visibilidad** (E5): lado de lectura sobre el registro único y la facturación —
   tablero con conteo por estado, alertas de excepción (`stale`: operación abierta sin actividad;
   `missing_pod`: entrega sin prueba de entrega) y KPIs por cliente (activas, entregadas,
@@ -109,5 +112,5 @@ documenta los dos esquemas de autenticación de la Fase 0: `x-tenant-id` (operad
 
 ### Pendiente (próximos sprints de Fase 0)
 
-Export de facturas a ERP (US3.5); API pública documentada (Swagger/OpenAPI) y auth
-OAuth2/OIDC real (E6, hoy los headers `x-tenant-id`/`x-client-user-id` son el stub de sesión).
+Auth OAuth2/OIDC real (E6): hoy los headers `x-tenant-id` / `x-client-user-id` son el stub
+de sesión; falta reemplazarlos por tokens/sesiones reales. Es el único remate grande que queda.

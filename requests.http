@@ -159,6 +159,18 @@ x-tenant-id: {{tenantId}}
 POST {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/issue
 x-tenant-id: {{tenantId}}
 
+### --- EXPORT A ERP (US3.5) ---
+
+### E1. Exportar una factura EMITIDA al ERP (idempotente)
+# Requiere que la factura esté en estado issued. Devuelve el registro de
+# exportación con status y la referencia del ERP (externalRef).
+POST {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/export
+x-tenant-id: {{tenantId}}
+
+### E2. Consultar el último intento de exportación de una factura
+GET {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/export
+x-tenant-id: {{tenantId}}
+
 ### --- CONCILIACIÓN DE CARRIER (US3.4) ---
 
 ### C1. Registrar factura recibida de un carrier (una línea por operación)

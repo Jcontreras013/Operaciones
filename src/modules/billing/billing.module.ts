@@ -9,9 +9,12 @@ import { Invoice } from './entities/invoice.entity';
 import { InvoiceLine } from './entities/invoice-line.entity';
 import { CarrierInvoice } from './entities/carrier-invoice.entity';
 import { CarrierInvoiceLine } from './entities/carrier-invoice-line.entity';
+import { InvoiceExport } from './entities/invoice-export.entity';
 import { BillingService } from './billing.service';
 import { ChargeEngine } from './charge-engine.service';
 import { BillingController } from './billing.controller';
+import { ERP_CONNECTOR } from './erp/erp-connector';
+import { StubErpConnector } from './erp/stub-erp.connector';
 
 @Module({
   imports: [
@@ -24,10 +27,17 @@ import { BillingController } from './billing.controller';
       CostItem,
       CarrierInvoice,
       CarrierInvoiceLine,
+      InvoiceExport,
     ]),
     OperationsModule,
   ],
-  providers: [BillingService, ChargeEngine],
+  providers: [
+    BillingService,
+    ChargeEngine,
+    // Conector ERP de la Fase 0. Sustituir por un adaptador real cambiando
+    // solo este proveedor (SAP/Oracle/…), sin tocar el servicio de facturación.
+    { provide: ERP_CONNECTOR, useClass: StubErpConnector },
+  ],
   controllers: [BillingController],
   exports: [BillingService],
 })

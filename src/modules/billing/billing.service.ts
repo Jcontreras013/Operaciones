@@ -1,9 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, DataSource, In, IsNull, Repository } from 'typeorm';
 import { Money } from '@common/money';
 import { OperationsService } from '@modules/operations/operations.service';
 import { CostItem } from '@modules/operations/entities/cost-item.entity';
+import { EventsService } from '@modules/events/events.service';
+import { DomainEventType } from '@modules/events/event-types';
 import { RateCard } from './entities/rate-card.entity';
 import { RateRule } from './entities/rate-rule.entity';
 import { ChargeItem } from './entities/charge-item.entity';
@@ -11,11 +13,13 @@ import { Invoice } from './entities/invoice.entity';
 import { InvoiceLine } from './entities/invoice-line.entity';
 import { CarrierInvoice } from './entities/carrier-invoice.entity';
 import { CarrierInvoiceLine } from './entities/carrier-invoice-line.entity';
-import { CarrierInvoiceStatus, InvoiceStatus } from './billing.enums';
+import { InvoiceExport } from './entities/invoice-export.entity';
+import { CarrierInvoiceStatus, InvoiceExportStatus, InvoiceStatus } from './billing.enums';
 import { CreateRateCardDto } from './dto/create-rate-card.dto';
 import { AddChargeDto } from './dto/add-charge.dto';
 import { GenerateInvoiceDto } from './dto/generate-invoice.dto';
 import { RegisterCarrierInvoiceDto } from './dto/register-carrier-invoice.dto';
+import { ERP_CONNECTOR, ErpConnector, ErpInvoicePayload } from './erp/erp-connector';
 
 @Injectable()
 export class BillingService {
@@ -30,7 +34,11 @@ export class BillingService {
     private readonly carrierInvoices: Repository<CarrierInvoice>,
     @InjectRepository(CarrierInvoiceLine)
     private readonly carrierInvoiceLines: Repository<CarrierInvoiceLine>,
+    @InjectRepository(InvoiceExport)
+    private readonly invoiceExports: Repository<InvoiceExport>,
     private readonly operations: OperationsService,
+    private readonly events: EventsService,
+    @Inject(ERP_CONNECTOR) private readonly erp: ErpConnector,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -433,5 +441,89 @@ export class BillingService {
   ): Promise<string> {
     const items = await this.costs.find({ where: { tenantId, operationId, supplier } });
     return Money.sum(items.map((c) => c.amountMinor));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Export a ERP (US3.5)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Exporta una factura emitida al ERP a través del conector configurado.
+   * Es idempotente: si la factura ya se exportó con éxito, devuelve ese
+   * registro sin volver a enviarla. Cada intento (éxito o fallo) queda auditado.
+   */
+  async exportInvoice(tenantId: string, invoiceId: string): Promise<InvoiceExport> {
+    const invoice = await this.getInvoice(tenantId, invoiceId);
+    if (invoice.status !== InvoiceStatus.ISSUED) {
+      throw new BadRequestException('Solo se pueden exportar facturas emitidas (issued)');
+    }
+
+    const already = await this.invoiceExports.findOne({
+      where: { tenantId, invoiceId, status: InvoiceExportStatus.EXPORTED },
+    });
+    if (already) {
+      return already;
+    }
+
+    const lines = await this.getInvoiceLines(tenantId, invoiceId);
+    const payload: ErpInvoicePayload = {
+      tenantId,
+      invoiceNumber: invoice.number,
+      clientId: invoice.clientId,
+      currency: invoice.currency,
+      totalMinor: invoice.totalMinor,
+      issuedAt: invoice.issuedAt ? invoice.issuedAt.toISOString() : null,
+      lines: lines.map((l) => ({
+        description: l.description,
+        quantity: l.quantity,
+        rateMinor: l.rateMinor,
+        amountMinor: l.amountMinor,
+      })),
+    };
+
+    try {
+      const result = await this.erp.export(payload);
+      const record = await this.invoiceExports.save({
+        tenantId,
+        invoiceId,
+        status: InvoiceExportStatus.EXPORTED,
+        externalRef: result.externalRef,
+        payload: payload as unknown as Record<string, unknown>,
+        error: null,
+        exportedAt: new Date(),
+      });
+      await this.events.publish({
+        tenantId,
+        type: DomainEventType.INVOICE_EXPORTED,
+        entity: 'Invoice',
+        entityId: invoiceId,
+        payload: { externalRef: result.externalRef, number: invoice.number },
+        occurredAt: new Date(),
+      });
+      return record;
+    } catch (err) {
+      // Se persiste el intento fallido para auditoría; el estado lo refleja.
+      return this.invoiceExports.save({
+        tenantId,
+        invoiceId,
+        status: InvoiceExportStatus.FAILED,
+        externalRef: null,
+        payload: payload as unknown as Record<string, unknown>,
+        error: err instanceof Error ? err.message : String(err),
+        exportedAt: null,
+      });
+    }
+  }
+
+  /** Último intento de exportación de una factura. */
+  async getInvoiceExport(tenantId: string, invoiceId: string): Promise<InvoiceExport> {
+    const record = await this.invoiceExports.findOne({
+      where: { tenantId, invoiceId },
+      order: { createdAt: 'DESC' },
+    });
+    if (!record) {
+      throw new NotFoundException('La factura no tiene exportaciones registradas');
+    }
+    return record;
   }
 }
