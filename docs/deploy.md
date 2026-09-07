@@ -10,17 +10,22 @@ son crear las cuentas/proyectos y completar unas pocas variables secretas o depe
 
 ---
 
-## 1. Base de datos en Supabase
+## 1. Base de datos (PostgreSQL)
 
-1. Crea un proyecto en [supabase.com](https://supabase.com). Elige región y una contraseña de BD.
-2. Ve a **Project Settings → Database → Connection string** y copia la **URI**.
-   - Usa la conexión **directa** (host `db.<ref>.supabase.co`, puerto `5432`) o el
-     **session pooler**. Evita el *transaction pooler* (PgBouncer, 6543): rompe los
-     prepared statements que usa TypeORM.
-   - La URI se ve así:
-     `postgresql://postgres:TU_PASSWORD@db.xxxxxxxx.supabase.co:5432/postgres`
-3. No hace falta crear tablas ni extensiones a mano: la migración inicial hace
-   `CREATE EXTENSION IF NOT EXISTS "uuid-ossp"` y crea todo el esquema.
+La app necesita un PostgreSQL estándar (conexión por `DATABASE_URL`). **Appwrite no sirve**
+(es un BaaS con API propia, no expone Postgres). Dos caminos:
+
+**Opción A — Postgres de Render (por defecto en `render.yaml`).** El Blueprint incluye un
+bloque `databases` que crea `operaciones-db` y cablea `DATABASE_URL` al backend
+automáticamente. No hay que copiar nada. Plan free: 1 GB (se borra a los ~30 días de inactividad).
+
+**Opción B — Postgres externo (Neon, Supabase, etc.).** Borra el bloque `databases` de
+`render.yaml` y define `DATABASE_URL` como `sync: false` en `operaciones-api`; pega la URI del
+proveedor en el panel. En Neon: crea el proyecto, copia la connection string (incluye
+`?sslmode=require`). En Supabase: usa la conexión **directa** `:5432`, no el pooler 6543.
+
+En cualquier caso, no hay que crear tablas ni extensiones a mano: la migración inicial hace
+`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"` y crea todo el esquema al arrancar el backend.
 
 ---
 
