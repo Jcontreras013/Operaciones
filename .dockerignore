@@ -5,3 +5,6 @@ coverage
 .env
 *.log
 npm-debug.log*
+# El frontend no forma parte de la imagen del backend.
+web
+docs

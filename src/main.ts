@@ -8,6 +8,15 @@ import { AppModule } from './app.module';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
+  // CORS: en producción, CORS_ORIGIN lista los orígenes permitidos (coma-
+  // separados), p. ej. la URL del frontend en Render. Sin la variable se
+  // permite cualquier origen (cómodo en desarrollo).
+  const corsOrigin = process.env.CORS_ORIGIN;
+  app.enableCors({
+    origin: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) : true,
+    credentials: true,
+  });
+
   // Validación global de DTOs: rechaza propiedades desconocidas y transforma
   // los payloads a las clases DTO (requisito para class-validator).
   app.useGlobalPipes(

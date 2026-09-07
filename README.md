@@ -156,11 +156,25 @@ inventario (WMS) y rutas (última milla); portal de cliente y app del conductor 
   `triggerStatus`). Los cargos de actividad pueden no estar atados a una operación y guardan su
   `source`. Verificado: recepción×20 → 2000, pick×5 → 250, entrega → 4000, todo automático.
 
+## Despliegue
+
+Preparado para **Render** (backend + frontend) + **Supabase** (PostgreSQL) vía
+[`render.yaml`](./render.yaml). Paso a paso en [`docs/deploy.md`](./docs/deploy.md).
+
+Producción usa **migraciones** de TypeORM (no `synchronize`): soporta `DATABASE_URL` con
+`DATABASE_SSL=true`, y aplica las migraciones al arrancar con `DATABASE_MIGRATIONS_RUN=true`.
+CORS se restringe con `CORS_ORIGIN`. La migración inicial (`src/migrations`) crea las 25 tablas
+y la extensión `uuid-ossp`.
+
+```bash
+npm run migration:run                      # aplica pendientes contra DATABASE_URL
+npm run migration:generate --name=Cambio   # genera una nueva tras editar entidades
+```
+
 ### Estado
 
-**Fase 0 completa** (E1–E6). **Fase 1 en curso**: WMS y TMS/última milla entregados y
-verificados end-to-end. Pendiente de Fase 1: app del conductor (hoy los endpoints de POD ya
-existen; falta la interfaz), picking optimizado (olas/zonas), y enganchar los eventos de
-almacén/entrega a la facturación por actividad. Mejoras diferibles: federación OIDC con IdP
-externo (los claims ya son compatibles), refresh tokens, y migraciones de esquema para
-producción (hoy `synchronize` solo en desarrollo).
+**Fase 0 completa** (E1–E6). **Fase 1 en curso**: WMS, TMS/última milla y facturación por
+actividad entregados y verificados end-to-end; primera consola web funcional. **Deploy** listo
+(Render + Supabase, con migraciones). Pendiente de Fase 1: app del conductor (los endpoints de
+POD ya existen; falta la interfaz) y picking optimizado (olas/zonas). Mejoras diferibles:
+federación OIDC con IdP externo (los claims ya son compatibles) y refresh tokens.
