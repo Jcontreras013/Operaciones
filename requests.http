@@ -159,5 +159,25 @@ x-tenant-id: {{tenantId}}
 POST {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/issue
 x-tenant-id: {{tenantId}}
 
+### --- TORRE DE VISIBILIDAD (E5) ---
+
+### 17. Tablero: conteo por estado + operaciones recientes
+GET {{baseUrl}}/v1/visibility/board
+x-tenant-id: {{tenantId}}
+
+### 17b. Tablero filtrado por cliente
+GET {{baseUrl}}/v1/visibility/board?clientId=REEMPLAZAR_CLIENT_ID
+x-tenant-id: {{tenantId}}
+
+### 18. Alertas de excepción (umbral de demora configurable)
+# stale: operación abierta sin actividad en más de staleHours horas.
+# missing_pod: operación entregada sin prueba de entrega.
+GET {{baseUrl}}/v1/visibility/exceptions?staleHours=24
+x-tenant-id: {{tenantId}}
+
+### 19. KPIs de un cliente (actividad + ingresos/costos/margen)
+GET {{baseUrl}}/v1/visibility/clients/REEMPLAZAR_CLIENT_ID/kpis
+x-tenant-id: {{tenantId}}
+
 ### Health check (público)
 GET {{baseUrl}}/health

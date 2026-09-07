@@ -33,6 +33,7 @@ src/
 │  ├─ clients/       E1 · Clientes (dueños de la carga)
 │  ├─ operations/    E2 · Registro único: operación, hitos, documentos, costos
 │  ├─ billing/       E3 · Rate cards, motor de cargos y facturas
+│  ├─ visibility/    E5 · Tablero, alertas de excepción y KPIs (read model)
 │  └─ events/        E6 · Bus de eventos (patrón outbox)
 └─ health/           Health check
 ```
@@ -87,8 +88,12 @@ Ejemplos de uso de la API en [`requests.http`](./requests.http).
   los cargos se **derivan de los eventos** de la operación, nunca por re-captura —
   `per_service` al crear, `handling` al llegar a un estado, y `storage` calculado por días al
   entregar. Generación de facturas draft → aprobar → emitir, con montos en enteros (sin floats).
+- **Torre de visibilidad** (E5): lado de lectura sobre el registro único y la facturación —
+  tablero con conteo por estado, alertas de excepción (`stale`: operación abierta sin actividad;
+  `missing_pod`: entrega sin prueba de entrega) y KPIs por cliente (activas, entregadas,
+  ingresos, costos y margen).
 
 ### Pendiente (próximos sprints de Fase 0)
 
 Conciliación de facturas de carrier vs. margen (US3.4) y export a ERP (US3.5); portal de
-cliente (E4); torre de visibilidad (E5); API pública documentada y auth OAuth2/OIDC (E6).
+cliente (E4); API pública documentada y auth OAuth2/OIDC (E6).

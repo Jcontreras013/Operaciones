@@ -7,6 +7,7 @@ import { TenancyModule } from '@modules/tenancy/tenancy.module';
 import { ClientsModule } from '@modules/clients/clients.module';
 import { OperationsModule } from '@modules/operations/operations.module';
 import { BillingModule } from '@modules/billing/billing.module';
+import { VisibilityModule } from '@modules/visibility/visibility.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -18,6 +19,7 @@ import { HealthController } from './health/health.controller';
     ClientsModule,
     OperationsModule,
     BillingModule,
+    VisibilityModule,
   ],
   controllers: [HealthController],
 })
