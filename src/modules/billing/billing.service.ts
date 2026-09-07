@@ -113,13 +113,14 @@ export class BillingService {
   async createCharge(params: {
     tenantId: string;
     clientId: string;
-    operationId: string;
+    operationId?: string | null;
     chargeType: ChargeItem['chargeType'];
     description: string;
     quantity: number;
     rateMinor?: number | string;
     currency?: string;
     rateRuleId?: string | null;
+    source?: string | null;
   }): Promise<ChargeItem> {
     let rateMinor = params.rateMinor;
     let currency = params.currency;
@@ -145,7 +146,8 @@ export class BillingService {
     return this.charges.save({
       tenantId: params.tenantId,
       clientId: params.clientId,
-      operationId: params.operationId,
+      operationId: params.operationId ?? null,
+      source: params.source ?? null,
       chargeType: params.chargeType,
       description: params.description,
       quantity: params.quantity,
@@ -179,6 +181,20 @@ export class BillingService {
   listCharges(tenantId: string, operationId: string): Promise<ChargeItem[]> {
     return this.charges.find({
       where: { tenantId, operationId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  /** Cargos de un cliente (incluye los de actividad sin operación). */
+  listClientCharges(
+    tenantId: string,
+    clientId: string,
+    onlyPending = false,
+  ): Promise<ChargeItem[]> {
+    return this.charges.find({
+      where: onlyPending
+        ? { tenantId, clientId, invoiceId: IsNull() }
+        : { tenantId, clientId },
       order: { createdAt: 'ASC' },
     });
   }

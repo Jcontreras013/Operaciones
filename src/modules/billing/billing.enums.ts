@@ -10,6 +10,8 @@ export enum ChargeType {
   PICK_PACK = 'pick_pack',
   /** Valor agregado (VAS): cargo manual del operador. */
   VAS = 'vas',
+  /** Última milla: se dispara al entregar (evento delivery.delivered). */
+  LAST_MILE = 'last_mile',
 }
 
 /** Unidad de cobro de una regla de tarifa. */

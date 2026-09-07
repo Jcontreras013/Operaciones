@@ -43,6 +43,16 @@ export class BillingController {
     return this.billing.listRateCards(tenantId, clientId);
   }
 
+  /** Cargos de un cliente (incluye los de actividad sin operación). */
+  @Get('clients/:clientId/charges')
+  listClientCharges(
+    @CurrentTenant() tenantId: string,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @Query('pending') pending?: string,
+  ) {
+    return this.billing.listClientCharges(tenantId, clientId, pending === 'true');
+  }
+
   // --- Cargos (US3.2) ---
 
   @Post('operations/:id/charges')

@@ -131,6 +131,12 @@ documenta los dos esquemas de autenticación de la Fase 0: `x-tenant-id` (operad
   nearest-neighbor en la Fase 1 y SimpliRoute/Locus enchufables después); despacho de la ruta y
   **prueba de entrega (POD)** por parada (recibido por, foto, nota) o marca de fallo. Emite
   eventos `delivery.*` / `route.dispatched` al outbox y cierra la ruta al no quedar paradas activas.
+- **Facturación por actividad end-to-end** (cierra el ciclo operación→cobro): el motor de cargos
+  también reacciona a los eventos de la operación física — `warehouse.receipt` → HANDLING,
+  `warehouse.pick` → PICK_PACK, `delivery.delivered` → LAST_MILE — creando el cargo desde la
+  regla correspondiente de la rate card (las reglas *de actividad* son las que no tienen
+  `triggerStatus`). Los cargos de actividad pueden no estar atados a una operación y guardan su
+  `source`. Verificado: recepción×20 → 2000, pick×5 → 250, entrega → 4000, todo automático.
 
 ### Estado
 

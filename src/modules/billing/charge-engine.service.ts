@@ -28,6 +28,60 @@ export class ChargeEngine implements OnModuleInit {
   onModuleInit(): void {
     this.events.on(DomainEventType.OPERATION_CREATED, (e) => this.onOperationCreated(e));
     this.events.on(DomainEventType.OPERATION_MILESTONE_ADDED, (e) => this.onMilestone(e));
+    // Facturación por actividad derivada de la operación física (Fase 1):
+    this.events.on(DomainEventType.WAREHOUSE_RECEIPT, (e) =>
+      this.onActivity(e, ChargeType.HANDLING),
+    );
+    this.events.on(DomainEventType.WAREHOUSE_PICK, (e) =>
+      this.onActivity(e, ChargeType.PICK_PACK),
+    );
+    this.events.on(DomainEventType.DELIVERY_DELIVERED, (e) =>
+      this.onActivity(e, ChargeType.LAST_MILE),
+    );
+  }
+
+  /**
+   * Cargo por actividad: un evento operativo (recepción/pick/entrega) genera un
+   * cargo si la rate card del cliente tiene una regla de ese tipo SIN
+   * triggerStatus (las reglas con triggerStatus se disparan por hitos de la
+   * operación, no por actividad física). La cantidad sale del payload del
+   * evento (unidades movidas; 1 en la entrega).
+   */
+  private async onActivity(event: DomainEvent, chargeType: ChargeType): Promise<void> {
+    const tenantId = event.tenantId;
+    const clientId = event.payload.clientId as string | undefined;
+    if (!clientId) {
+      return;
+    }
+    const card = await this.billing.getActiveRateCard(tenantId, clientId);
+    if (!card) {
+      return;
+    }
+    const rules = await this.billing.getRules(tenantId, card.id);
+    const rule = rules.find((r) => r.chargeType === chargeType && r.triggerStatus === null);
+    if (!rule) {
+      return; // La rate card no cobra esta actividad.
+    }
+
+    const quantity =
+      typeof event.payload.quantity === 'number' ? (event.payload.quantity as number) : 1;
+    const operationId =
+      typeof event.payload.operationId === 'string'
+        ? (event.payload.operationId as string)
+        : null;
+
+    await this.billing.createCharge({
+      tenantId,
+      clientId,
+      operationId,
+      chargeType,
+      description: rule.description,
+      quantity,
+      rateMinor: rule.rateMinor,
+      currency: card.currency,
+      rateRuleId: rule.id,
+      source: event.type,
+    });
   }
 
   /** Al crear la operación: aplica las reglas PER_SERVICE (monto fijo). */

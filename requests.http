@@ -138,6 +138,13 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/charges
 Authorization: Bearer {{token}}
 
+### 12b. Cargos del cliente (incluye los de actividad: almacén y última milla)
+# Los eventos warehouse.receipt/pick y delivery.delivered generan cargos
+# HANDLING / PICK_PACK / LAST_MILE automáticamente si la rate card los define
+# como reglas de actividad (sin triggerStatus). ?pending=true = sólo sin facturar.
+GET {{baseUrl}}/v1/clients/REEMPLAZAR_CLIENT_ID/charges?pending=true
+Authorization: Bearer {{token}}
+
 ### 13. Agregar un cargo manual (VAS)
 POST {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/charges
 Content-Type: application/json

@@ -15,9 +15,14 @@ export class ChargeItem extends TenantOwnedEntity {
   @Column('uuid')
   clientId!: string;
 
+  /** Operación de origen. Nulo en cargos de actividad (almacén, última milla). */
   @Index()
-  @Column('uuid')
-  operationId!: string;
+  @Column('uuid', { nullable: true })
+  operationId!: string | null;
+
+  /** Origen del cargo (p. ej. el evento que lo generó), para trazabilidad. */
+  @Column({ type: 'varchar', nullable: true })
+  source!: string | null;
 
   @Column({ type: 'enum', enum: ChargeType })
   chargeType!: ChargeType;
