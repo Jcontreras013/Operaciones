@@ -9,4 +9,9 @@ export class CreateClientUserDto {
   @MinLength(2)
   @MaxLength(120)
   name!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(200)
+  password!: string;
 }

@@ -5,7 +5,6 @@ import { Milestone } from '@modules/operations/entities/milestone.entity';
 import { Document } from '@modules/operations/entities/document.entity';
 import { Invoice } from '@modules/billing/entities/invoice.entity';
 import { InvoiceLine } from '@modules/billing/entities/invoice-line.entity';
-import { ClientUser } from '@modules/clients/client-user.entity';
 import { PortalService } from './portal.service';
 import { PortalController } from './portal.controller';
 import { PortalMiddleware } from './portal.middleware';
@@ -17,7 +16,7 @@ import { PortalMiddleware } from './portal.middleware';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Operation, Milestone, Document, Invoice, InvoiceLine, ClientUser]),
+    TypeOrmModule.forFeature([Operation, Milestone, Document, Invoice, InvoiceLine]),
   ],
   providers: [PortalService],
   controllers: [PortalController],

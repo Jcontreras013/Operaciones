@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { Password } from '@common/password';
 import { Tenant } from './entities/tenant.entity';
 import { User, UserRole } from './entities/user.entity';
 import { CreateTenantDto } from './dto/create-tenant.dto';
@@ -24,6 +25,8 @@ export class TenancyService {
       throw new ConflictException(`El slug "${dto.slug}" ya está en uso`);
     }
 
+    const passwordHash = await Password.hash(dto.adminPassword);
+
     return this.dataSource.transaction(async (manager) => {
       const tenant = await manager.getRepository(Tenant).save({
         name: dto.name,
@@ -35,6 +38,7 @@ export class TenancyService {
         email: dto.adminEmail,
         name: dto.adminName ?? dto.adminEmail,
         role: UserRole.ADMIN,
+        passwordHash,
         active: true,
       });
       return tenant;
@@ -47,7 +51,12 @@ export class TenancyService {
     if (dup) {
       throw new ConflictException(`El email "${dto.email}" ya existe en este operador`);
     }
-    return this.users.save({ tenantId, ...dto, active: true });
+    const { password, ...rest } = dto;
+    const passwordHash = await Password.hash(password);
+    const user = await this.users.save({ tenantId, ...rest, passwordHash, active: true });
+    // No devolver el hash aunque save() lo tenga en memoria.
+    delete (user as Partial<User>).passwordHash;
+    return user;
   }
 
   listUsers(tenantId: string): Promise<User[]> {

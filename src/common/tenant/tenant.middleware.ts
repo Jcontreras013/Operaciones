@@ -1,23 +1,29 @@
-import { BadRequestException, Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
+import { TokenService } from '@modules/auth/token.service';
 import { TenantContext } from './tenant-context';
 
 /**
- * Resuelve el tenant del request y lo fija en el TenantContext.
+ * Autentica al usuario del operador con un JWT (E6) y fija el TenantContext.
  *
- * Fase 0: el tenant llega en el header `x-tenant-id`. Cuando se agregue auth
- * real (OAuth2/OIDC, épica E1), el tenantId se derivará del token en vez del
- * header, sin tocar el resto de la aplicación.
- *
- * Las rutas públicas (health, alta de tenant) se excluyen en AppModule.
+ * Valida el header `Authorization: Bearer <token>`, exige un token de tipo
+ * 'operator' y DERIVA el tenantId (y usuario/rol) de los claims — ya no se
+ * confía en un header con el tenantId. Las rutas públicas (health, alta de
+ * operador, login) se excluyen en AppModule.
  */
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
+  constructor(private readonly tokens: TokenService) {}
+
   use(req: Request, _res: Response, next: NextFunction): void {
-    const header = req.header('x-tenant-id');
-    if (!header) {
-      throw new BadRequestException('Falta el header x-tenant-id');
+    const token = this.tokens.extractBearer(req.header('authorization'));
+    const claims = this.tokens.verify(token);
+    if (claims.typ !== 'operator') {
+      throw new UnauthorizedException('Se requiere un token de operador');
     }
-    TenantContext.run({ tenantId: header }, () => next());
+    TenantContext.run(
+      { tenantId: claims.tenantId, userId: claims.sub, role: claims.role },
+      () => next(),
+    );
   }
 }

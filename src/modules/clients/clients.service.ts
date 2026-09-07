@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Password } from '@common/password';
 import { EventsService } from '@modules/events/events.service';
 import { DomainEventType } from '@modules/events/event-types';
 import { Client } from './client.entity';
@@ -61,7 +62,17 @@ export class ClientsService {
     if (dup) {
       throw new ConflictException(`El email "${dto.email}" ya está registrado`);
     }
-    return this.clientUsers.save({ tenantId, clientId, ...dto, active: true });
+    const { password, ...rest } = dto;
+    const passwordHash = await Password.hash(password);
+    const user = await this.clientUsers.save({
+      tenantId,
+      clientId,
+      ...rest,
+      passwordHash,
+      active: true,
+    });
+    delete (user as Partial<ClientUser>).passwordHash;
+    return user;
   }
 
   listClientUsers(tenantId: string, clientId: string): Promise<ClientUser[]> {

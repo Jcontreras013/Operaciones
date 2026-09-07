@@ -23,12 +23,12 @@ async function bootstrap(): Promise<void> {
   const config = new DocumentBuilder()
     .setTitle('Operaciones API')
     .setDescription(
-      'Plataforma 3PL — API de la Fase 0. Las rutas del operador requieren el ' +
-        'header x-tenant-id; las del portal de cliente, x-client-user-id.',
+      'Plataforma 3PL — API de la Fase 0. Autenticación por JWT (Bearer): ' +
+        'obtén un token en POST /v1/auth/login (operador) o POST /portal/auth/login (cliente).',
     )
     .setVersion('0.1')
-    .addApiKey({ type: 'apiKey', name: 'x-tenant-id', in: 'header' }, TENANT_AUTH)
-    .addApiKey({ type: 'apiKey', name: 'x-client-user-id', in: 'header' }, PORTAL_AUTH)
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, TENANT_AUTH)
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, PORTAL_AUTH)
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document, {

@@ -9,12 +9,14 @@ import { OperationsModule } from '@modules/operations/operations.module';
 import { BillingModule } from '@modules/billing/billing.module';
 import { VisibilityModule } from '@modules/visibility/visibility.module';
 import { PortalModule } from '@modules/portal/portal.module';
+import { AuthModule } from '@modules/auth/auth.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
+    AuthModule,
     EventsModule,
     TenancyModule,
     ClientsModule,
@@ -37,6 +39,7 @@ export class AppModule implements NestModule {
       .exclude(
         { path: 'health', method: RequestMethod.ALL },
         { path: 'v1/tenants', method: RequestMethod.POST },
+        { path: 'v1/auth/login', method: RequestMethod.POST },
         { path: 'portal', method: RequestMethod.ALL },
         { path: 'portal/(.*)', method: RequestMethod.ALL },
       )

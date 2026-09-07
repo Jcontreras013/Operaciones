@@ -19,6 +19,11 @@ export class CreateTenantDto {
   adminEmail!: string;
 
   @IsString()
+  @MinLength(8)
+  @MaxLength(200)
+  adminPassword!: string;
+
+  @IsString()
   @IsOptional()
   @MaxLength(120)
   adminName?: string;

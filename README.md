@@ -82,8 +82,13 @@ documenta los dos esquemas de autenticación de la Fase 0: `x-tenant-id` (operad
 
 ### Implementado en este incremento
 
-- **Multi-tenancy** (E1): aislamiento por `tenant_id` en toda entidad; el tenant se resuelve
-  por request vía header `x-tenant-id` (se reemplazará por el token de auth en E1 completo).
+- **Autenticación JWT** (E6): login con contraseña (bcrypt) en `POST /v1/auth/login` (operador)
+  y `POST /portal/auth/login` (cliente); devuelve un access token Bearer. El `tenantId` y el
+  `clientId` se **derivan de los claims del token**, no de headers. Los tokens llevan `typ`
+  (`operator`/`portal`), de modo que un token de operador no sirve en el portal ni viceversa.
+  Los claims son estándar (`sub`, `tenantId`, …) para poder enchufar un IdP OIDC externo después.
+- **Multi-tenancy** (E1): aislamiento por `tenant_id` en toda entidad; el tenant llega en el
+  token validado por el middleware (antes era un header stub).
 - **Alta de operador y usuarios** con roles (admin/ops/finance/readonly).
 - **Clientes** del operador.
 - **Registro único de operación** (E2): crear operación, registrar hitos con avance de estado,
@@ -110,7 +115,9 @@ documenta los dos esquemas de autenticación de la Fase 0: `x-tenant-id` (operad
   Expone sus operaciones, línea de tiempo, documentos y facturas, con filtros por estado y
   referencia (US4.1–US4.3). También completa el alta de usuarios de cliente (US1.4).
 
-### Pendiente (próximos sprints de Fase 0)
+### Estado
 
-Auth OAuth2/OIDC real (E6): hoy los headers `x-tenant-id` / `x-client-user-id` son el stub
-de sesión; falta reemplazarlos por tokens/sesiones reales. Es el único remate grande que queda.
+**Fase 0 completa.** E1–E6 implementadas y verificadas end-to-end contra PostgreSQL real.
+Próximo paso natural (Fase 1): WMS multi-tenant y TMS/última milla. Mejoras diferibles sobre
+lo actual: federación OIDC con un IdP externo (los claims ya son compatibles), refresh tokens,
+y migraciones de esquema para producción (hoy `synchronize` solo en desarrollo).

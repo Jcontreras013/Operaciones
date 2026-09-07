@@ -22,6 +22,10 @@ export class User extends TenantOwnedEntity {
   @Column({ type: 'enum', enum: UserRole, default: UserRole.OPS })
   role!: UserRole;
 
+  /** Hash bcrypt de la contraseña. Nunca se expone en respuestas. */
+  @Column({ type: 'varchar', nullable: true, select: false })
+  passwordHash!: string | null;
+
   @Column({ default: true })
   active!: boolean;
 }

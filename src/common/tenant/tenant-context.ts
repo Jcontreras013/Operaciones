@@ -12,6 +12,10 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  */
 export interface TenantStore {
   tenantId: string;
+  /** Usuario del operador autenticado (del token). */
+  userId?: string;
+  /** Rol del usuario autenticado (del token). */
+  role?: string;
 }
 
 const storage = new AsyncLocalStorage<TenantStore>();

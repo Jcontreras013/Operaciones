@@ -1,37 +1,26 @@
 import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { NextFunction, Request, Response } from 'express';
-import { Repository } from 'typeorm';
-import { ClientUser } from '@modules/clients/client-user.entity';
+import { TokenService } from '@modules/auth/token.service';
 import { PortalContext } from './portal-context';
 
 /**
- * Autentica al usuario de cliente y fija el PortalContext.
+ * Autentica al usuario de cliente con un JWT (E6) y fija el PortalContext.
  *
- * Fase 0: el usuario de cliente llega en el header `x-client-user-id`. El
- * middleware carga el ClientUser y DERIVA de él tenantId y clientId — el
- * request nunca los provee. Cuando llegue la auth real (E6), el clientUserId
- * saldrá del token y este middleware no cambia su contrato.
+ * Exige un token de tipo 'portal' y DERIVA tenantId y clientId de los claims —
+ * el request nunca los provee. Así cada cliente ve solo lo suyo.
  */
 @Injectable()
 export class PortalMiddleware implements NestMiddleware {
-  constructor(
-    @InjectRepository(ClientUser) private readonly clientUsers: Repository<ClientUser>,
-  ) {}
+  constructor(private readonly tokens: TokenService) {}
 
-  async use(req: Request, _res: Response, next: NextFunction): Promise<void> {
-    const clientUserId = req.header('x-client-user-id');
-    if (!clientUserId) {
-      throw new UnauthorizedException('Falta el header x-client-user-id');
+  use(req: Request, _res: Response, next: NextFunction): void {
+    const token = this.tokens.extractBearer(req.header('authorization'));
+    const claims = this.tokens.verify(token);
+    if (claims.typ !== 'portal') {
+      throw new UnauthorizedException('Se requiere un token de portal');
     }
-
-    const user = await this.clientUsers.findOne({ where: { id: clientUserId, active: true } });
-    if (!user) {
-      throw new UnauthorizedException('Usuario de cliente inválido o inactivo');
-    }
-
     PortalContext.run(
-      { tenantId: user.tenantId, clientId: user.clientId, clientUserId: user.id },
+      { tenantId: claims.tenantId, clientId: claims.clientId, clientUserId: claims.sub },
       () => next(),
     );
   }
