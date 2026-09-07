@@ -35,6 +35,8 @@ src/
 │  ├─ billing/       E3 · Rate cards, motor de cargos y facturas
 │  ├─ visibility/    E5 · Tablero, alertas de excepción y KPIs (read model)
 │  ├─ portal/        E4 · Portal de cliente (auth propia, solo-lectura)
+│  ├─ warehouse/     Fase 1 · WMS: almacenes, ubicaciones, inventario, movimientos
+│  ├─ auth/          E6 · Autenticación JWT (login operador y portal)
 │  └─ events/        E6 · Bus de eventos (patrón outbox)
 └─ health/           Health check
 ```
@@ -115,9 +117,17 @@ documenta los dos esquemas de autenticación de la Fase 0: `x-tenant-id` (operad
   Expone sus operaciones, línea de tiempo, documentos y facturas, con filtros por estado y
   referencia (US4.1–US4.3). También completa el alta de usuarios de cliente (US1.4).
 
+### Fase 1 (en curso)
+
+- **WMS multi-tenant** (módulo `warehouse`): almacenes y ubicaciones (bins); **inventario en
+  tiempo real segmentado por cliente** (cada cliente ve solo lo suyo aunque comparta almacén);
+  movimientos atómicos de **recepción, transferencia/putaway y pick** con validación de
+  existencia y log de auditoría; consultas de inventario por ubicación y resumen agregado por
+  cliente+SKU. Cada movimiento emite un evento (`warehouse.*`) al outbox.
+
 ### Estado
 
-**Fase 0 completa.** E1–E6 implementadas y verificadas end-to-end contra PostgreSQL real.
-Próximo paso natural (Fase 1): WMS multi-tenant y TMS/última milla. Mejoras diferibles sobre
-lo actual: federación OIDC con un IdP externo (los claims ya son compatibles), refresh tokens,
-y migraciones de esquema para producción (hoy `synchronize` solo en desarrollo).
+**Fase 0 completa** (E1–E6). **Fase 1 en curso**: WMS entregado y verificado end-to-end;
+pendientes TMS/última milla (integrar ruteo) y app del conductor con prueba de entrega.
+Mejoras diferibles: federación OIDC con IdP externo (los claims ya son compatibles), refresh
+tokens, y migraciones de esquema para producción (hoy `synchronize` solo en desarrollo).

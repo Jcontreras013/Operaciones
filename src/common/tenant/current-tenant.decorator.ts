@@ -10,3 +10,8 @@ import { TenantContext } from './tenant-context';
 export const CurrentTenant = createParamDecorator(
   (_data: unknown, _ctx: ExecutionContext): string => TenantContext.requireTenantId(),
 );
+
+/** Inyecta el id del usuario del operador autenticado (o undefined). */
+export const CurrentUserId = createParamDecorator(
+  (_data: unknown, _ctx: ExecutionContext): string | undefined => TenantContext.getUserId(),
+);

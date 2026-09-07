@@ -296,5 +296,61 @@ Authorization: Bearer {{portalToken}}
 GET {{baseUrl}}/portal/invoices/REEMPLAZAR_INVOICE_ID/lines
 Authorization: Bearer {{portalToken}}
 
+### --- ALMACÉN / WMS (Fase 1) ---
+
+### W1. Crear un almacén
+POST {{baseUrl}}/v1/warehouses
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "code": "LIM", "name": "Almacén Lima" }
+
+### W2. Crear ubicaciones (recepción y storage)
+POST {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/locations
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "code": "RECV-01", "kind": "receiving" }
+
+###
+POST {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/locations
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "code": "A-01-01", "kind": "storage" }
+
+### W3. Recepción de mercancía de un cliente
+POST {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/receipts
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "clientId": "REEMPLAZAR_CLIENT_ID", "locationId": "REEMPLAZAR_RECV_LOCATION_ID", "sku": "SKU-1", "quantity": 100 }
+
+### W4. Putaway / transferencia entre ubicaciones
+POST {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/moves
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "clientId": "REEMPLAZAR_CLIENT_ID", "fromLocationId": "REEMPLAZAR_RECV_ID", "toLocationId": "REEMPLAZAR_STORAGE_ID", "sku": "SKU-1", "quantity": 100 }
+
+### W5. Pick (salida) desde una ubicación
+POST {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/picks
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "clientId": "REEMPLAZAR_CLIENT_ID", "locationId": "REEMPLAZAR_STORAGE_ID", "sku": "SKU-1", "quantity": 30 }
+
+### W6. Inventario en tiempo real (filtrable por cliente/sku)
+GET {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/inventory?clientId=REEMPLAZAR_CLIENT_ID
+Authorization: Bearer {{token}}
+
+### W7. Resumen de inventario agregado por cliente + SKU
+GET {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/inventory/summary
+Authorization: Bearer {{token}}
+
+### W8. Log de movimientos del almacén
+GET {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/movements
+Authorization: Bearer {{token}}
+
 ### Health check (público)
 GET {{baseUrl}}/health

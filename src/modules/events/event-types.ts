@@ -10,6 +10,9 @@ export enum DomainEventType {
   OPERATION_COST_ADDED = 'operation.cost_added',
   CLIENT_CREATED = 'client.created',
   INVOICE_EXPORTED = 'invoice.exported',
+  WAREHOUSE_RECEIPT = 'warehouse.receipt',
+  WAREHOUSE_TRANSFER = 'warehouse.transfer',
+  WAREHOUSE_PICK = 'warehouse.pick',
 }
 
 /** Forma del payload que se persiste en el outbox y se despacha en memoria. */

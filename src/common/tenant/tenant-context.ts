@@ -39,4 +39,9 @@ export const TenantContext = {
     }
     return tenantId;
   },
+
+  /** userId del operador autenticado, si está en el contexto. */
+  getUserId(): string | undefined {
+    return storage.getStore()?.userId;
+  },
 };
