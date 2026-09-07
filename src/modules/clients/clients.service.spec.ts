@@ -14,9 +14,14 @@ describe('ClientsService', () => {
       find: jest.fn().mockResolvedValue([saved]),
       findOne: jest.fn(),
     };
+    const clientUsers = { findOne: jest.fn(), find: jest.fn(), save: jest.fn() };
     const events = { publish: jest.fn().mockResolvedValue(undefined) };
-    const service = new ClientsService(repo as never, events as unknown as EventsService);
-    return { service, repo, events, saved };
+    const service = new ClientsService(
+      repo as never,
+      clientUsers as never,
+      events as unknown as EventsService,
+    );
+    return { service, repo, clientUsers, events, saved };
   }
 
   it('crea el cliente con el tenantId del contexto y publica CLIENT_CREATED', async () => {

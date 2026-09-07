@@ -8,6 +8,7 @@ import { ClientsModule } from '@modules/clients/clients.module';
 import { OperationsModule } from '@modules/operations/operations.module';
 import { BillingModule } from '@modules/billing/billing.module';
 import { VisibilityModule } from '@modules/visibility/visibility.module';
+import { PortalModule } from '@modules/portal/portal.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -20,13 +21,15 @@ import { HealthController } from './health/health.controller';
     OperationsModule,
     BillingModule,
     VisibilityModule,
+    PortalModule,
   ],
   controllers: [HealthController],
 })
 export class AppModule implements NestModule {
   /**
-   * El TenantMiddleware exige x-tenant-id en todas las rutas salvo las
-   * públicas: health y el alta de operador (que aún no tiene tenant).
+   * El TenantMiddleware exige x-tenant-id en todas las rutas salvo:
+   *  - health y el alta de operador (rutas públicas sin tenant),
+   *  - el portal, que tiene su propia autenticación (PortalMiddleware).
    */
   configure(consumer: MiddlewareConsumer): void {
     consumer
@@ -34,6 +37,8 @@ export class AppModule implements NestModule {
       .exclude(
         { path: 'health', method: RequestMethod.ALL },
         { path: 'v1/tenants', method: RequestMethod.POST },
+        { path: 'portal', method: RequestMethod.ALL },
+        { path: 'portal/(.*)', method: RequestMethod.ALL },
       )
       .forRoutes('*');
   }

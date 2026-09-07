@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/commo
 import { CurrentTenant } from '@common/tenant/current-tenant.decorator';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
+import { CreateClientUserDto } from './dto/create-client-user.dto';
 
 @Controller('v1/clients')
 export class ClientsController {
@@ -20,5 +21,22 @@ export class ClientsController {
   @Get(':id')
   get(@CurrentTenant() tenantId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.clients.get(tenantId, id);
+  }
+
+  @Post(':clientId/users')
+  addClientUser(
+    @CurrentTenant() tenantId: string,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+    @Body() dto: CreateClientUserDto,
+  ) {
+    return this.clients.addClientUser(tenantId, clientId, dto);
+  }
+
+  @Get(':clientId/users')
+  listClientUsers(
+    @CurrentTenant() tenantId: string,
+    @Param('clientId', ParseUUIDPipe) clientId: string,
+  ) {
+    return this.clients.listClientUsers(tenantId, clientId);
   }
 }

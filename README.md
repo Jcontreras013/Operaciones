@@ -34,6 +34,7 @@ src/
 │  ├─ operations/    E2 · Registro único: operación, hitos, documentos, costos
 │  ├─ billing/       E3 · Rate cards, motor de cargos y facturas
 │  ├─ visibility/    E5 · Tablero, alertas de excepción y KPIs (read model)
+│  ├─ portal/        E4 · Portal de cliente (auth propia, solo-lectura)
 │  └─ events/        E6 · Bus de eventos (patrón outbox)
 └─ health/           Health check
 ```
@@ -92,8 +93,14 @@ Ejemplos de uso de la API en [`requests.http`](./requests.http).
   tablero con conteo por estado, alertas de excepción (`stale`: operación abierta sin actividad;
   `missing_pod`: entrega sin prueba de entrega) y KPIs por cliente (activas, entregadas,
   ingresos, costos y margen).
+- **Portal de cliente** (E4): superficie de solo-lectura con **autenticación propia**. El
+  usuario de cliente se identifica con `x-client-user-id`; el `tenantId` y el `clientId` se
+  **derivan** de ese usuario (nunca del request), garantizando que cada cliente vea solo lo suyo.
+  Expone sus operaciones, línea de tiempo, documentos y facturas, con filtros por estado y
+  referencia (US4.1–US4.3). También completa el alta de usuarios de cliente (US1.4).
 
 ### Pendiente (próximos sprints de Fase 0)
 
-Conciliación de facturas de carrier vs. margen (US3.4) y export a ERP (US3.5); portal de
-cliente (E4); API pública documentada y auth OAuth2/OIDC (E6).
+Conciliación de facturas de carrier vs. margen (US3.4) y export a ERP (US3.5); API pública
+documentada y auth OAuth2/OIDC real (E6, hoy los headers `x-tenant-id`/`x-client-user-id`
+son el stub de sesión).

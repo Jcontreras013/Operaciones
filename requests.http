@@ -179,5 +179,53 @@ x-tenant-id: {{tenantId}}
 GET {{baseUrl}}/v1/visibility/clients/REEMPLAZAR_CLIENT_ID/kpis
 x-tenant-id: {{tenantId}}
 
+### --- PORTAL DE CLIENTE (E4) ---
+# El portal usa su propia autenticación: x-client-user-id (no x-tenant-id).
+# El tenant y el cliente se DERIVAN del usuario; el cliente solo ve lo suyo.
+
+### 20. Alta de usuario de cliente (lo hace el operador, US1.4)
+POST {{baseUrl}}/v1/clients/REEMPLAZAR_CLIENT_ID/users
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "email": "ana@cliente.com",
+  "name": "Ana (Cliente)"
+}
+
+@clientUserId = REEMPLAZAR_CON_EL_ID_DEL_USUARIO_DE_CLIENTE
+
+### 21. Perfil de la sesión de portal
+GET {{baseUrl}}/portal/me
+x-client-user-id: {{clientUserId}}
+
+### 22. Mis operaciones (solo las del cliente autenticado)
+GET {{baseUrl}}/portal/operations
+x-client-user-id: {{clientUserId}}
+
+### 22b. Filtrar por estado y/o referencia (US4.3)
+GET {{baseUrl}}/portal/operations?status=in_transit&reference=OP-2026
+x-client-user-id: {{clientUserId}}
+
+### 23. Detalle, línea de tiempo y documentos de una operación
+GET {{baseUrl}}/portal/operations/REEMPLAZAR_OPERATION_ID
+x-client-user-id: {{clientUserId}}
+
+###
+GET {{baseUrl}}/portal/operations/REEMPLAZAR_OPERATION_ID/milestones
+x-client-user-id: {{clientUserId}}
+
+###
+GET {{baseUrl}}/portal/operations/REEMPLAZAR_OPERATION_ID/documents
+x-client-user-id: {{clientUserId}}
+
+### 24. Mis facturas y sus líneas (US4.2)
+GET {{baseUrl}}/portal/invoices
+x-client-user-id: {{clientUserId}}
+
+###
+GET {{baseUrl}}/portal/invoices/REEMPLAZAR_INVOICE_ID/lines
+x-client-user-id: {{clientUserId}}
+
 ### Health check (público)
 GET {{baseUrl}}/health
