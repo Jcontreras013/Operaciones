@@ -28,6 +28,6 @@ export class Document extends TenantOwnedEntity {
   @Column()
   storageKey!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   contentType!: string | null;
 }

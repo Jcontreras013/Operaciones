@@ -19,6 +19,6 @@ export class Milestone extends TenantOwnedEntity {
   @Column('uuid', { nullable: true })
   recordedBy!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   note!: string | null;
 }

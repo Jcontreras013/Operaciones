@@ -41,9 +41,9 @@ export class Operation extends TenantOwnedEntity {
   @Column({ type: 'enum', enum: OperationStatus, default: OperationStatus.CREATED })
   status!: OperationStatus;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   origin!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   destination!: string | null;
 }

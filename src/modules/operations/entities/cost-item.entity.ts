@@ -23,6 +23,6 @@ export class CostItem extends TenantOwnedEntity {
   currency!: string;
 
   /** Proveedor/carrier al que corresponde el costo. */
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   supplier!: string | null;
 }

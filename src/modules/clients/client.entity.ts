@@ -9,13 +9,13 @@ export class Client extends TenantOwnedEntity {
   name!: string;
 
   /** Código interno del cliente en el operador (ej. para referencias). */
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   code!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   contactEmail!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   contactName!: string | null;
 
   @Column({ default: true })

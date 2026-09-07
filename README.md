@@ -39,12 +39,29 @@ src/
 
 ### Cómo correr
 
+Con Docker (recomendado):
+
+```bash
+docker compose up -d db         # solo PostgreSQL
+npm install
+npm run start:dev               # API en http://localhost:3000
+
+# o todo en contenedores (base + API):
+docker compose up --build
+```
+
+Sin Docker (PostgreSQL propio):
+
 ```bash
 npm install
 cp .env.example .env            # ajustar credenciales de PostgreSQL
-# levantar un PostgreSQL local y crear la base indicada en .env
+# crear la base indicada en .env
 npm run start:dev               # API en http://localhost:3000
 ```
+
+> Verificado end-to-end: alta de operador → cliente → rate card → operación →
+> hitos que disparan cargos automáticos (`per_service`, `handling`, `storage`
+> por días) → factura `draft → approved → issued`. Ver [`requests.http`](./requests.http).
 
 Verificación sin base de datos:
 

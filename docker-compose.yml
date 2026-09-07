@@ -1,0 +1,45 @@
+# Entorno de desarrollo de Operaciones: PostgreSQL + API.
+#
+#   docker compose up -d db      # solo la base (para correr la API con npm run start:dev)
+#   docker compose up --build    # base + API completas
+#
+# En desarrollo DATABASE_SYNCHRONIZE=true crea el esquema desde las entidades.
+# En producción esto va en false y se usan migraciones.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: operaciones
+      POSTGRES_PASSWORD: operaciones
+      POSTGRES_DB: operaciones
+    ports:
+      - '5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U operaciones -d operaciones']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_USER: operaciones
+      DATABASE_PASSWORD: operaciones
+      DATABASE_NAME: operaciones
+      DATABASE_SYNCHRONIZE: 'true'
+      DATABASE_LOGGING: 'false'
+    ports:
+      - '3000:3000'
+
+volumes:
+  db-data:
