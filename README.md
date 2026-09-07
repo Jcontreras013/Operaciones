@@ -36,6 +36,7 @@ src/
 │  ├─ visibility/    E5 · Tablero, alertas de excepción y KPIs (read model)
 │  ├─ portal/        E4 · Portal de cliente (auth propia, solo-lectura)
 │  ├─ warehouse/     Fase 1 · WMS: almacenes, ubicaciones, inventario, movimientos
+│  ├─ delivery/      Fase 1 · TMS/última milla: flota, rutas, optimización, POD
 │  ├─ auth/          E6 · Autenticación JWT (login operador y portal)
 │  └─ events/        E6 · Bus de eventos (patrón outbox)
 └─ health/           Health check
@@ -124,10 +125,18 @@ documenta los dos esquemas de autenticación de la Fase 0: `x-tenant-id` (operad
   movimientos atómicos de **recepción, transferencia/putaway y pick** con validación de
   existencia y log de auditoría; consultas de inventario por ubicación y resumen agregado por
   cliente+SKU. Cada movimiento emite un evento (`warehouse.*`) al outbox.
+- **TMS / última milla** (módulo `delivery`): **flota propia** (vehículos) y **carriers 3PL**;
+  entregas en un pool que se asignan a **rutas** (asignadas a flota propia **o** a un carrier —
+  orquestación); **optimización de rutas enchufable** (puerto/adaptador, con un optimizador
+  nearest-neighbor en la Fase 1 y SimpliRoute/Locus enchufables después); despacho de la ruta y
+  **prueba de entrega (POD)** por parada (recibido por, foto, nota) o marca de fallo. Emite
+  eventos `delivery.*` / `route.dispatched` al outbox y cierra la ruta al no quedar paradas activas.
 
 ### Estado
 
-**Fase 0 completa** (E1–E6). **Fase 1 en curso**: WMS entregado y verificado end-to-end;
-pendientes TMS/última milla (integrar ruteo) y app del conductor con prueba de entrega.
-Mejoras diferibles: federación OIDC con IdP externo (los claims ya son compatibles), refresh
-tokens, y migraciones de esquema para producción (hoy `synchronize` solo en desarrollo).
+**Fase 0 completa** (E1–E6). **Fase 1 en curso**: WMS y TMS/última milla entregados y
+verificados end-to-end. Pendiente de Fase 1: app del conductor (hoy los endpoints de POD ya
+existen; falta la interfaz), picking optimizado (olas/zonas), y enganchar los eventos de
+almacén/entrega a la facturación por actividad. Mejoras diferibles: federación OIDC con IdP
+externo (los claims ya son compatibles), refresh tokens, y migraciones de esquema para
+producción (hoy `synchronize` solo en desarrollo).

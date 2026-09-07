@@ -13,6 +13,10 @@ export enum DomainEventType {
   WAREHOUSE_RECEIPT = 'warehouse.receipt',
   WAREHOUSE_TRANSFER = 'warehouse.transfer',
   WAREHOUSE_PICK = 'warehouse.pick',
+  DELIVERY_CREATED = 'delivery.created',
+  ROUTE_DISPATCHED = 'route.dispatched',
+  DELIVERY_DELIVERED = 'delivery.delivered',
+  DELIVERY_FAILED = 'delivery.failed',
 }
 
 /** Forma del payload que se persiste en el outbox y se despacha en memoria. */

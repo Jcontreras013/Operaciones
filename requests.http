@@ -352,5 +352,69 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/movements
 Authorization: Bearer {{token}}
 
+### --- TMS / ÚLTIMA MILLA (Fase 1) ---
+
+### T1. Flota propia y carrier 3PL
+POST {{baseUrl}}/v1/vehicles
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "plate": "ABC-123", "name": "Camión 1", "capacity": 100 }
+
+###
+POST {{baseUrl}}/v1/carriers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "name": "Carrier 3PL Express" }
+
+### T2. Crear entregas en el pool (con coordenadas para optimizar)
+POST {{baseUrl}}/v1/deliveries
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "clientId": "REEMPLAZAR_CLIENT_ID", "reference": "PED-0001", "address": "Av Ejemplo 100", "lat": -12.10, "lng": -77.00 }
+
+### T3. Crear una ruta con flota propia (o carrier)
+# own -> requiere vehicleId; carrier -> requiere carrierId.
+POST {{baseUrl}}/v1/routes
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "date": "2026-09-08", "assignmentType": "own", "vehicleId": "REEMPLAZAR_VEHICLE_ID", "driverName": "Juan", "originLat": -12.12, "originLng": -77.00 }
+
+### T4. Asignar entregas del pool a la ruta
+POST {{baseUrl}}/v1/routes/REEMPLAZAR_ROUTE_ID/stops
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "deliveryIds": ["REEMPLAZAR_DELIVERY_ID_1", "REEMPLAZAR_DELIVERY_ID_2"] }
+
+### T5. Optimizar el orden de las paradas (nearest-neighbor)
+POST {{baseUrl}}/v1/routes/REEMPLAZAR_ROUTE_ID/optimize
+Authorization: Bearer {{token}}
+
+### T6. Despachar la ruta (paradas -> en_route)
+POST {{baseUrl}}/v1/routes/REEMPLAZAR_ROUTE_ID/dispatch
+Authorization: Bearer {{token}}
+
+### T7. Ver las paradas ordenadas de la ruta
+GET {{baseUrl}}/v1/routes/REEMPLAZAR_ROUTE_ID/stops
+Authorization: Bearer {{token}}
+
+### T8. Prueba de entrega (POD): cerrar una entrega
+POST {{baseUrl}}/v1/deliveries/REEMPLAZAR_DELIVERY_ID/complete
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "receivedBy": "Portería", "podNote": "Entregado en recepción", "podPhotoKey": "pods/ped-0001.jpg" }
+
+### T9. Marcar una entrega como fallida
+POST {{baseUrl}}/v1/deliveries/REEMPLAZAR_DELIVERY_ID/fail
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "reason": "Cliente ausente" }
+
 ### Health check (público)
 GET {{baseUrl}}/health
