@@ -1,0 +1,24 @@
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { CurrentTenant } from '@common/tenant/current-tenant.decorator';
+import { ClientsService } from './clients.service';
+import { CreateClientDto } from './dto/create-client.dto';
+
+@Controller('v1/clients')
+export class ClientsController {
+  constructor(private readonly clients: ClientsService) {}
+
+  @Post()
+  create(@CurrentTenant() tenantId: string, @Body() dto: CreateClientDto) {
+    return this.clients.create(tenantId, dto);
+  }
+
+  @Get()
+  list(@CurrentTenant() tenantId: string) {
+    return this.clients.list(tenantId);
+  }
+
+  @Get(':id')
+  get(@CurrentTenant() tenantId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.clients.get(tenantId, id);
+  }
+}

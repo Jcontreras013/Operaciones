@@ -1,0 +1,100 @@
+# Ejemplos de la API de Operaciones (Fase 0).
+# Usar con la extensión REST Client de VS Code o como referencia para curl.
+# El header x-tenant-id identifica al operador en todas las rutas salvo las públicas.
+
+@baseUrl = http://localhost:3000
+@tenantId = REEMPLAZAR_CON_EL_ID_DEVUELTO_AL_CREAR_EL_OPERADOR
+
+### 1. Alta de operador (ruta pública, sin x-tenant-id)
+POST {{baseUrl}}/v1/tenants
+Content-Type: application/json
+
+{
+  "name": "Logística Andina",
+  "slug": "andina",
+  "adminEmail": "admin@andina.com",
+  "adminName": "Admin Andina"
+}
+
+### 2. Ver el operador actual
+GET {{baseUrl}}/v1/tenant
+x-tenant-id: {{tenantId}}
+
+### 3. Agregar un usuario de operaciones
+POST {{baseUrl}}/v1/users
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "email": "ops@andina.com",
+  "name": "Persona de Operaciones",
+  "role": "ops"
+}
+
+### 4. Alta de cliente (dueño de la carga)
+POST {{baseUrl}}/v1/clients
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "name": "Importadora del Sur",
+  "code": "IMPSUR",
+  "contactEmail": "logistica@impsur.com"
+}
+
+### 5. Crear una operación (registro único) — usar el clientId del paso 4
+POST {{baseUrl}}/v1/operations
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "clientId": "REEMPLAZAR_CLIENT_ID",
+  "reference": "OP-2026-0001",
+  "serviceType": "freight",
+  "origin": "Shanghái, CN",
+  "destination": "Callao, PE"
+}
+
+### 6. Registrar un hito (avanza el estado y emite un evento)
+POST {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/milestones
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "status": "in_transit",
+  "note": "Zarpó de origen"
+}
+
+### 7. Adjuntar un documento
+POST {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/documents
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "type": "bill_of_lading",
+  "fileName": "bl-op-2026-0001.pdf",
+  "storageKey": "docs/andina/bl-op-2026-0001.pdf"
+}
+
+### 8. Registrar un costo real (para margen y conciliación)
+POST {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/costs
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "concept": "Flete marítimo",
+  "amountMinor": 180000,
+  "currency": "USD",
+  "supplier": "Naviera XYZ"
+}
+
+### 9. Ver la línea de tiempo de la operación
+GET {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/milestones
+x-tenant-id: {{tenantId}}
+
+### 10. Listar operaciones (opcionalmente por cliente)
+GET {{baseUrl}}/v1/operations?clientId=REEMPLAZAR_CLIENT_ID
+x-tenant-id: {{tenantId}}
+
+### Health check (público)
+GET {{baseUrl}}/health
