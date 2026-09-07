@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+.git
+.env
+*.log
+npm-debug.log*
+# El frontend no forma parte de la imagen del backend.
+web
+docs

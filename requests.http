@@ -1,0 +1,427 @@
+# Ejemplos de la API de Operaciones (Fase 0).
+# Usar con la extensión REST Client de VS Code o como referencia para curl.
+# Autenticación por JWT: obtené un token en /v1/auth/login (operador) o
+# /portal/auth/login (cliente) y mandalo en Authorization: Bearer <token>.
+
+@baseUrl = http://localhost:3000
+@token = REEMPLAZAR_CON_EL_accessToken_DEL_LOGIN_DE_OPERADOR
+@portalToken = REEMPLAZAR_CON_EL_accessToken_DEL_LOGIN_DE_PORTAL
+
+### 1. Alta de operador (ruta pública). Crea el tenant y su admin con contraseña.
+POST {{baseUrl}}/v1/tenants
+Content-Type: application/json
+
+{
+  "name": "Logística Andina",
+  "slug": "andina",
+  "adminEmail": "admin@andina.com",
+  "adminPassword": "superseguro",
+  "adminName": "Admin Andina"
+}
+
+### 1b. Login de operador (ruta pública) -> copiar accessToken a {{token}}
+POST {{baseUrl}}/v1/auth/login
+Content-Type: application/json
+
+{
+  "tenantSlug": "andina",
+  "email": "admin@andina.com",
+  "password": "superseguro"
+}
+
+### 2. Ver el operador actual
+GET {{baseUrl}}/v1/tenant
+Authorization: Bearer {{token}}
+
+### 3. Agregar un usuario de operaciones (con contraseña)
+POST {{baseUrl}}/v1/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "ops@andina.com",
+  "name": "Persona de Operaciones",
+  "role": "ops",
+  "password": "opspassword"
+}
+
+### 4. Alta de cliente (dueño de la carga)
+POST {{baseUrl}}/v1/clients
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Importadora del Sur",
+  "code": "IMPSUR",
+  "contactEmail": "logistica@impsur.com"
+}
+
+### 5. Crear una operación (registro único) — usar el clientId del paso 4
+POST {{baseUrl}}/v1/operations
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "clientId": "REEMPLAZAR_CLIENT_ID",
+  "reference": "OP-2026-0001",
+  "serviceType": "freight",
+  "origin": "Shanghái, CN",
+  "destination": "Callao, PE"
+}
+
+### 6. Registrar un hito (avanza el estado y emite un evento)
+POST {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/milestones
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "in_transit",
+  "note": "Zarpó de origen"
+}
+
+### 7. Adjuntar un documento
+POST {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/documents
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "type": "bill_of_lading",
+  "fileName": "bl-op-2026-0001.pdf",
+  "storageKey": "docs/andina/bl-op-2026-0001.pdf"
+}
+
+### 8. Registrar un costo real (para margen y conciliación)
+POST {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/costs
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "concept": "Flete marítimo",
+  "amountMinor": 180000,
+  "currency": "USD",
+  "supplier": "Naviera XYZ"
+}
+
+### 9. Ver la línea de tiempo de la operación
+GET {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/milestones
+Authorization: Bearer {{token}}
+
+### 10. Listar operaciones (opcionalmente por cliente)
+GET {{baseUrl}}/v1/operations?clientId=REEMPLAZAR_CLIENT_ID
+Authorization: Bearer {{token}}
+
+### --- FACTURACIÓN MULTI-CLIENTE (E3) ---
+
+### 11. Crear la rate card del cliente (define cómo se cobra)
+# per_service: monto fijo al crear la operación.
+# handling: se dispara al llegar al estado in_warehouse.
+# storage: se calcula por días al entregar (delivered).
+POST {{baseUrl}}/v1/clients/REEMPLAZAR_CLIENT_ID/rate-cards
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Tarifa estándar 2026",
+  "currency": "USD",
+  "rules": [
+    { "chargeType": "per_service", "description": "Gestión de embarque", "rateMinor": 50000, "unit": "flat" },
+    { "chargeType": "handling", "description": "Recepción en almacén", "rateMinor": 1500, "unit": "per_movement", "triggerStatus": "in_warehouse" },
+    { "chargeType": "storage", "description": "Almacenaje", "rateMinor": 2000, "unit": "per_day" }
+  ]
+}
+
+# Ahora, al crear una operación de este cliente se genera el cargo per_service
+# automáticamente; al registrar el hito in_warehouse se genera el handling; y al
+# registrar delivered se calcula el almacenaje por días. Todo vía eventos.
+
+### 12. Ver los cargos generados para una operación
+GET {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/charges
+Authorization: Bearer {{token}}
+
+### 12b. Cargos del cliente (incluye los de actividad: almacén y última milla)
+# Los eventos warehouse.receipt/pick y delivery.delivered generan cargos
+# HANDLING / PICK_PACK / LAST_MILE automáticamente si la rate card los define
+# como reglas de actividad (sin triggerStatus). ?pending=true = sólo sin facturar.
+GET {{baseUrl}}/v1/clients/REEMPLAZAR_CLIENT_ID/charges?pending=true
+Authorization: Bearer {{token}}
+
+### 13. Agregar un cargo manual (VAS)
+POST {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/charges
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "chargeType": "vas",
+  "description": "Etiquetado especial",
+  "quantity": 3,
+  "rateMinor": 800
+}
+
+### 14. Generar una factura draft con los cargos pendientes del período
+POST {{baseUrl}}/v1/invoices/generate
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "clientId": "REEMPLAZAR_CLIENT_ID",
+  "periodStart": "2026-09-01T00:00:00Z",
+  "periodEnd": "2026-09-30T23:59:59Z"
+}
+
+### 15. Ver las líneas de la factura
+GET {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/lines
+Authorization: Bearer {{token}}
+
+### 16. Aprobar y emitir la factura
+POST {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/approve
+Authorization: Bearer {{token}}
+
+###
+POST {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/issue
+Authorization: Bearer {{token}}
+
+### --- EXPORT A ERP (US3.5) ---
+
+### E1. Exportar una factura EMITIDA al ERP (idempotente)
+# Requiere que la factura esté en estado issued. Devuelve el registro de
+# exportación con status y la referencia del ERP (externalRef).
+POST {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/export
+Authorization: Bearer {{token}}
+
+### E2. Consultar el último intento de exportación de una factura
+GET {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/export
+Authorization: Bearer {{token}}
+
+### --- CONCILIACIÓN DE CARRIER (US3.4) ---
+
+### C1. Registrar factura recibida de un carrier (una línea por operación)
+POST {{baseUrl}}/v1/carrier-invoices
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "supplier": "Naviera XYZ",
+  "number": "NAV-9001",
+  "currency": "USD",
+  "lines": [
+    { "operationId": "REEMPLAZAR_OPERATION_ID", "concept": "Flete", "declaredMinor": 30000 }
+  ]
+}
+
+### C2. Conciliar contra los costos registrados (tolerancia 0 por defecto)
+# Compara lo declarado por el carrier vs. la suma de CostItem de esa operación
+# para el mismo proveedor. Marca reconciled o disputed.
+POST {{baseUrl}}/v1/carrier-invoices/REEMPLAZAR_CARRIER_INVOICE_ID/reconcile
+Authorization: Bearer {{token}}
+
+### C2b. Conciliar admitiendo variaciones menores (tolerancia en menor unidad)
+POST {{baseUrl}}/v1/carrier-invoices/REEMPLAZAR_CARRIER_INVOICE_ID/reconcile?toleranceMinor=2000
+Authorization: Bearer {{token}}
+
+### C3. Ver factura de carrier y sus líneas (con variación tras conciliar)
+GET {{baseUrl}}/v1/carrier-invoices/REEMPLAZAR_CARRIER_INVOICE_ID/lines
+Authorization: Bearer {{token}}
+
+### C4. Margen de una operación (verificación antes de facturar)
+GET {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/financials
+Authorization: Bearer {{token}}
+
+### --- TORRE DE VISIBILIDAD (E5) ---
+
+### 17. Tablero: conteo por estado + operaciones recientes
+GET {{baseUrl}}/v1/visibility/board
+Authorization: Bearer {{token}}
+
+### 17b. Tablero filtrado por cliente
+GET {{baseUrl}}/v1/visibility/board?clientId=REEMPLAZAR_CLIENT_ID
+Authorization: Bearer {{token}}
+
+### 18. Alertas de excepción (umbral de demora configurable)
+# stale: operación abierta sin actividad en más de staleHours horas.
+# missing_pod: operación entregada sin prueba de entrega.
+GET {{baseUrl}}/v1/visibility/exceptions?staleHours=24
+Authorization: Bearer {{token}}
+
+### 19. KPIs de un cliente (actividad + ingresos/costos/margen)
+GET {{baseUrl}}/v1/visibility/clients/REEMPLAZAR_CLIENT_ID/kpis
+Authorization: Bearer {{token}}
+
+### --- PORTAL DE CLIENTE (E4) ---
+# El portal tiene su propia autenticación (token de tipo 'portal').
+# El tenant y el cliente se DERIVAN del token; el cliente solo ve lo suyo.
+
+### 20. Alta de usuario de cliente con contraseña (lo hace el operador, US1.4)
+POST {{baseUrl}}/v1/clients/REEMPLAZAR_CLIENT_ID/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "ana@cliente.com",
+  "name": "Ana (Cliente)",
+  "password": "clientepass"
+}
+
+### 20b. Login de portal (ruta pública) -> copiar accessToken a {{portalToken}}
+POST {{baseUrl}}/portal/auth/login
+Content-Type: application/json
+
+{
+  "tenantSlug": "andina",
+  "email": "ana@cliente.com",
+  "password": "clientepass"
+}
+
+### 21. Perfil de la sesión de portal
+GET {{baseUrl}}/portal/me
+Authorization: Bearer {{portalToken}}
+
+### 22. Mis operaciones (solo las del cliente autenticado)
+GET {{baseUrl}}/portal/operations
+Authorization: Bearer {{portalToken}}
+
+### 22b. Filtrar por estado y/o referencia (US4.3)
+GET {{baseUrl}}/portal/operations?status=in_transit&reference=OP-2026
+Authorization: Bearer {{portalToken}}
+
+### 23. Detalle, línea de tiempo y documentos de una operación
+GET {{baseUrl}}/portal/operations/REEMPLAZAR_OPERATION_ID
+Authorization: Bearer {{portalToken}}
+
+###
+GET {{baseUrl}}/portal/operations/REEMPLAZAR_OPERATION_ID/milestones
+Authorization: Bearer {{portalToken}}
+
+###
+GET {{baseUrl}}/portal/operations/REEMPLAZAR_OPERATION_ID/documents
+Authorization: Bearer {{portalToken}}
+
+### 24. Mis facturas y sus líneas (US4.2)
+GET {{baseUrl}}/portal/invoices
+Authorization: Bearer {{portalToken}}
+
+###
+GET {{baseUrl}}/portal/invoices/REEMPLAZAR_INVOICE_ID/lines
+Authorization: Bearer {{portalToken}}
+
+### --- ALMACÉN / WMS (Fase 1) ---
+
+### W1. Crear un almacén
+POST {{baseUrl}}/v1/warehouses
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "code": "LIM", "name": "Almacén Lima" }
+
+### W2. Crear ubicaciones (recepción y storage)
+POST {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/locations
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "code": "RECV-01", "kind": "receiving" }
+
+###
+POST {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/locations
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "code": "A-01-01", "kind": "storage" }
+
+### W3. Recepción de mercancía de un cliente
+POST {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/receipts
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "clientId": "REEMPLAZAR_CLIENT_ID", "locationId": "REEMPLAZAR_RECV_LOCATION_ID", "sku": "SKU-1", "quantity": 100 }
+
+### W4. Putaway / transferencia entre ubicaciones
+POST {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/moves
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "clientId": "REEMPLAZAR_CLIENT_ID", "fromLocationId": "REEMPLAZAR_RECV_ID", "toLocationId": "REEMPLAZAR_STORAGE_ID", "sku": "SKU-1", "quantity": 100 }
+
+### W5. Pick (salida) desde una ubicación
+POST {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/picks
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "clientId": "REEMPLAZAR_CLIENT_ID", "locationId": "REEMPLAZAR_STORAGE_ID", "sku": "SKU-1", "quantity": 30 }
+
+### W6. Inventario en tiempo real (filtrable por cliente/sku)
+GET {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/inventory?clientId=REEMPLAZAR_CLIENT_ID
+Authorization: Bearer {{token}}
+
+### W7. Resumen de inventario agregado por cliente + SKU
+GET {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/inventory/summary
+Authorization: Bearer {{token}}
+
+### W8. Log de movimientos del almacén
+GET {{baseUrl}}/v1/warehouses/REEMPLAZAR_WAREHOUSE_ID/movements
+Authorization: Bearer {{token}}
+
+### --- TMS / ÚLTIMA MILLA (Fase 1) ---
+
+### T1. Flota propia y carrier 3PL
+POST {{baseUrl}}/v1/vehicles
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "plate": "ABC-123", "name": "Camión 1", "capacity": 100 }
+
+###
+POST {{baseUrl}}/v1/carriers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "name": "Carrier 3PL Express" }
+
+### T2. Crear entregas en el pool (con coordenadas para optimizar)
+POST {{baseUrl}}/v1/deliveries
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "clientId": "REEMPLAZAR_CLIENT_ID", "reference": "PED-0001", "address": "Av Ejemplo 100", "lat": -12.10, "lng": -77.00 }
+
+### T3. Crear una ruta con flota propia (o carrier)
+# own -> requiere vehicleId; carrier -> requiere carrierId.
+POST {{baseUrl}}/v1/routes
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "date": "2026-09-08", "assignmentType": "own", "vehicleId": "REEMPLAZAR_VEHICLE_ID", "driverName": "Juan", "originLat": -12.12, "originLng": -77.00 }
+
+### T4. Asignar entregas del pool a la ruta
+POST {{baseUrl}}/v1/routes/REEMPLAZAR_ROUTE_ID/stops
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "deliveryIds": ["REEMPLAZAR_DELIVERY_ID_1", "REEMPLAZAR_DELIVERY_ID_2"] }
+
+### T5. Optimizar el orden de las paradas (nearest-neighbor)
+POST {{baseUrl}}/v1/routes/REEMPLAZAR_ROUTE_ID/optimize
+Authorization: Bearer {{token}}
+
+### T6. Despachar la ruta (paradas -> en_route)
+POST {{baseUrl}}/v1/routes/REEMPLAZAR_ROUTE_ID/dispatch
+Authorization: Bearer {{token}}
+
+### T7. Ver las paradas ordenadas de la ruta
+GET {{baseUrl}}/v1/routes/REEMPLAZAR_ROUTE_ID/stops
+Authorization: Bearer {{token}}
+
+### T8. Prueba de entrega (POD): cerrar una entrega
+POST {{baseUrl}}/v1/deliveries/REEMPLAZAR_DELIVERY_ID/complete
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "receivedBy": "Portería", "podNote": "Entregado en recepción", "podPhotoKey": "pods/ped-0001.jpg" }
+
+### T9. Marcar una entrega como fallida
+POST {{baseUrl}}/v1/deliveries/REEMPLAZAR_DELIVERY_ID/fail
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "reason": "Cliente ausente" }
+
+### Health check (público)
+GET {{baseUrl}}/health
