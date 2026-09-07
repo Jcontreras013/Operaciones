@@ -83,7 +83,25 @@ Ejemplos de uso de la API en [`requests.http`](./requests.http).
 documenta los dos esquemas de autenticación de la Fase 0: `x-tenant-id` (operador) y
 `x-client-user-id` (portal). Usa el botón **Authorize** para fijar los headers y probar.
 
-### Implementado en este incremento
+## Front end — consola del operador (`web/`)
+
+SPA en **React + TypeScript + Vite**, con React Query para los datos y un sistema de estilos
+propio en CSS (misma identidad visual que los estudios). Autenticación por JWT contra la API.
+
+```bash
+cd web
+npm install
+cp .env.example .env
+npm run dev        # http://localhost:5173 (proxya /api al backend en :3000)
+```
+
+Requiere el backend corriendo. Incluye: **login** (guarda el token, redirige a login al expirar),
+**tablero** (métricas por estado + excepciones + operaciones recientes), **clientes**
+(listar/crear) y **operaciones** (listar/crear + detalle con línea de tiempo y registro de hitos).
+Verificado end-to-end contra la API real (login → datos en vivo). Próximas vistas: facturación,
+inventario (WMS) y rutas (última milla); portal de cliente y app del conductor como SPAs aparte.
+
+## Implementado en este incremento (backend)
 
 - **Autenticación JWT** (E6): login con contraseña (bcrypt) en `POST /v1/auth/login` (operador)
   y `POST /portal/auth/login` (cliente); devuelve un access token Bearer. El `tenantId` y el
