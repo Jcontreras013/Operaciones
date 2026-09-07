@@ -6,6 +6,7 @@ import { EventsModule } from '@modules/events/events.module';
 import { TenancyModule } from '@modules/tenancy/tenancy.module';
 import { ClientsModule } from '@modules/clients/clients.module';
 import { OperationsModule } from '@modules/operations/operations.module';
+import { BillingModule } from '@modules/billing/billing.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -16,6 +17,7 @@ import { HealthController } from './health/health.controller';
     TenancyModule,
     ClientsModule,
     OperationsModule,
+    BillingModule,
   ],
   controllers: [HealthController],
 })

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { EventsService } from '@modules/events/events.service';
-import { DomainEventType } from '@modules/events/event-types';
+import { DomainEvent, DomainEventType } from '@modules/events/event-types';
 import { ClientsService } from '@modules/clients/clients.service';
 import { Operation, OperationStatus, ServiceType } from './entities/operation.entity';
 import { Milestone } from './entities/milestone.entity';
@@ -33,8 +33,11 @@ export class OperationsService {
     // Valida que el cliente pertenezca al tenant (lanza si no existe).
     await this.clients.get(tenantId, dto.clientId);
 
-    return this.dataSource.transaction(async (manager) => {
-      const operation = await manager.getRepository(Operation).save({
+    const now = new Date();
+    let event!: DomainEvent;
+
+    const operation = await this.dataSource.transaction(async (manager) => {
+      const op = await manager.getRepository(Operation).save({
         tenantId,
         clientId: dto.clientId,
         reference: dto.reference,
@@ -44,30 +47,32 @@ export class OperationsService {
         destination: dto.destination ?? null,
       });
 
-      const now = new Date();
       await manager.getRepository(Milestone).save({
         tenantId,
-        operationId: operation.id,
+        operationId: op.id,
         status: OperationStatus.CREATED,
         occurredAt: now,
         recordedBy: null,
         note: 'Operación creada',
       });
 
-      await this.events.publish(
-        {
-          tenantId,
-          type: DomainEventType.OPERATION_CREATED,
-          entity: 'Operation',
-          entityId: operation.id,
-          payload: { clientId: operation.clientId, reference: operation.reference },
-          occurredAt: now,
-        },
-        manager,
-      );
+      event = {
+        tenantId,
+        type: DomainEventType.OPERATION_CREATED,
+        entity: 'Operation',
+        entityId: op.id,
+        payload: { clientId: op.clientId, reference: op.reference },
+        occurredAt: now,
+      };
+      // Persiste el evento en el outbox dentro de la transacción.
+      await this.events.record(event, manager);
 
-      return operation;
+      return op;
     });
+
+    // Despacha en memoria tras el commit, para que los handlers lean datos ya confirmados.
+    this.events.dispatch(event);
+    return operation;
   }
 
   /** Registra un hito y avanza el estado de la operación (US2.2, US2.4). */
@@ -78,9 +83,10 @@ export class OperationsService {
   ): Promise<Milestone> {
     const operation = await this.get(tenantId, operationId);
     const occurredAt = dto.occurredAt ? new Date(dto.occurredAt) : new Date();
+    let event!: DomainEvent;
 
-    return this.dataSource.transaction(async (manager) => {
-      const milestone = await manager.getRepository(Milestone).save({
+    const milestone = await this.dataSource.transaction(async (manager) => {
+      const saved = await manager.getRepository(Milestone).save({
         tenantId,
         operationId: operation.id,
         status: dto.status,
@@ -93,20 +99,21 @@ export class OperationsService {
         .getRepository(Operation)
         .update({ id: operation.id, tenantId }, { status: dto.status });
 
-      await this.events.publish(
-        {
-          tenantId,
-          type: DomainEventType.OPERATION_MILESTONE_ADDED,
-          entity: 'Operation',
-          entityId: operation.id,
-          payload: { status: dto.status, occurredAt: occurredAt.toISOString() },
-          occurredAt,
-        },
-        manager,
-      );
+      event = {
+        tenantId,
+        type: DomainEventType.OPERATION_MILESTONE_ADDED,
+        entity: 'Operation',
+        entityId: operation.id,
+        payload: { status: dto.status, occurredAt: occurredAt.toISOString() },
+        occurredAt,
+      };
+      await this.events.record(event, manager);
 
-      return milestone;
+      return saved;
     });
+
+    this.events.dispatch(event);
+    return milestone;
   }
 
   /** Adjunta un documento (US2.3). */

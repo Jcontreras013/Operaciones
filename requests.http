@@ -96,5 +96,68 @@ x-tenant-id: {{tenantId}}
 GET {{baseUrl}}/v1/operations?clientId=REEMPLAZAR_CLIENT_ID
 x-tenant-id: {{tenantId}}
 
+### --- FACTURACIÓN MULTI-CLIENTE (E3) ---
+
+### 11. Crear la rate card del cliente (define cómo se cobra)
+# per_service: monto fijo al crear la operación.
+# handling: se dispara al llegar al estado in_warehouse.
+# storage: se calcula por días al entregar (delivered).
+POST {{baseUrl}}/v1/clients/REEMPLAZAR_CLIENT_ID/rate-cards
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "name": "Tarifa estándar 2026",
+  "currency": "USD",
+  "rules": [
+    { "chargeType": "per_service", "description": "Gestión de embarque", "rateMinor": 50000, "unit": "flat" },
+    { "chargeType": "handling", "description": "Recepción en almacén", "rateMinor": 1500, "unit": "per_movement", "triggerStatus": "in_warehouse" },
+    { "chargeType": "storage", "description": "Almacenaje", "rateMinor": 2000, "unit": "per_day" }
+  ]
+}
+
+# Ahora, al crear una operación de este cliente se genera el cargo per_service
+# automáticamente; al registrar el hito in_warehouse se genera el handling; y al
+# registrar delivered se calcula el almacenaje por días. Todo vía eventos.
+
+### 12. Ver los cargos generados para una operación
+GET {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/charges
+x-tenant-id: {{tenantId}}
+
+### 13. Agregar un cargo manual (VAS)
+POST {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/charges
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "chargeType": "vas",
+  "description": "Etiquetado especial",
+  "quantity": 3,
+  "rateMinor": 800
+}
+
+### 14. Generar una factura draft con los cargos pendientes del período
+POST {{baseUrl}}/v1/invoices/generate
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "clientId": "REEMPLAZAR_CLIENT_ID",
+  "periodStart": "2026-09-01T00:00:00Z",
+  "periodEnd": "2026-09-30T23:59:59Z"
+}
+
+### 15. Ver las líneas de la factura
+GET {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/lines
+x-tenant-id: {{tenantId}}
+
+### 16. Aprobar y emitir la factura
+POST {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/approve
+x-tenant-id: {{tenantId}}
+
+###
+POST {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/issue
+x-tenant-id: {{tenantId}}
+
 ### Health check (público)
 GET {{baseUrl}}/health

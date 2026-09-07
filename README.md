@@ -32,6 +32,7 @@ src/
 │  ├─ tenancy/       E1 · Operadores y usuarios (alta de operador)
 │  ├─ clients/       E1 · Clientes (dueños de la carga)
 │  ├─ operations/    E2 · Registro único: operación, hitos, documentos, costos
+│  ├─ billing/       E3 · Rate cards, motor de cargos y facturas
 │  └─ events/        E6 · Bus de eventos (patrón outbox)
 └─ health/           Health check
 ```
@@ -63,10 +64,14 @@ Ejemplos de uso de la API en [`requests.http`](./requests.http).
 - **Clientes** del operador.
 - **Registro único de operación** (E2): crear operación, registrar hitos con avance de estado,
   adjuntar documentos y registrar costos.
-- **Bus de eventos** (E6): cada cambio persiste un evento en el outbox y se despacha en memoria,
-  listo para que facturación y visibilidad se suscriban sin acoplar dominios.
+- **Bus de eventos** (E6): cada cambio persiste un evento en el outbox (dentro de la transacción)
+  y se despacha en memoria tras el commit, sin acoplar dominios.
+- **Motor de facturación multi-cliente** (E3): rate cards por cliente con reglas por actividad;
+  los cargos se **derivan de los eventos** de la operación, nunca por re-captura —
+  `per_service` al crear, `handling` al llegar a un estado, y `storage` calculado por días al
+  entregar. Generación de facturas draft → aprobar → emitir, con montos en enteros (sin floats).
 
 ### Pendiente (próximos sprints de Fase 0)
 
-Motor de facturación multi-cliente (E3), portal de cliente (E4), torre de visibilidad (E5),
-API pública documentada y auth OAuth2/OIDC (E6), conector ERP.
+Conciliación de facturas de carrier vs. margen (US3.4) y export a ERP (US3.5); portal de
+cliente (E4); torre de visibilidad (E5); API pública documentada y auth OAuth2/OIDC (E6).
