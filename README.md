@@ -75,6 +75,11 @@ npm test            # pruebas unitarias
 
 Ejemplos de uso de la API en [`requests.http`](./requests.http).
 
+**Documentación interactiva (OpenAPI/Swagger):** con la API corriendo, en
+`http://localhost:3000/docs` (y el JSON en `/docs-json`). Agrupa las rutas por área y
+documenta los dos esquemas de autenticación de la Fase 0: `x-tenant-id` (operador) y
+`x-client-user-id` (portal). Usa el botón **Authorize** para fijar los headers y probar.
+
 ### Implementado en este incremento
 
 - **Multi-tenancy** (E1): aislamiento por `tenant_id` en toda entidad; el tenant se resuelve

@@ -7,13 +7,17 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { CurrentTenant } from '@common/tenant/current-tenant.decorator';
+import { TENANT_AUTH } from '@common/swagger.constants';
 import { OperationsService } from './operations.service';
 import { CreateOperationDto } from './dto/create-operation.dto';
 import { AddMilestoneDto } from './dto/add-milestone.dto';
 import { AddDocumentDto } from './dto/add-document.dto';
 import { AddCostDto } from './dto/add-cost.dto';
 
+@ApiTags('Operaciones')
+@ApiSecurity(TENANT_AUTH)
 @Controller('v1/operations')
 export class OperationsController {
   constructor(private readonly operations: OperationsService) {}

@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { PORTAL_AUTH, TENANT_AUTH } from '@common/swagger.constants';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
@@ -16,9 +18,28 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  // Documentación OpenAPI en /docs. Los dos esquemas de auth de la Fase 0 se
+  // modelan como api-keys por header (stub de sesión hasta OAuth2/OIDC).
+  const config = new DocumentBuilder()
+    .setTitle('Operaciones API')
+    .setDescription(
+      'Plataforma 3PL — API de la Fase 0. Las rutas del operador requieren el ' +
+        'header x-tenant-id; las del portal de cliente, x-client-user-id.',
+    )
+    .setVersion('0.1')
+    .addApiKey({ type: 'apiKey', name: 'x-tenant-id', in: 'header' }, TENANT_AUTH)
+    .addApiKey({ type: 'apiKey', name: 'x-client-user-id', in: 'header' }, PORTAL_AUTH)
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, document, {
+    swaggerOptions: { persistAuthorization: true },
+  });
+
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
-  new Logger('Bootstrap').log(`Operaciones escuchando en el puerto ${port}`);
+  const logger = new Logger('Bootstrap');
+  logger.log(`Operaciones escuchando en el puerto ${port}`);
+  logger.log(`Documentación OpenAPI en http://localhost:${port}/docs`);
 }
 
 void bootstrap();

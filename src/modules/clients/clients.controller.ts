@@ -1,9 +1,13 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { CurrentTenant } from '@common/tenant/current-tenant.decorator';
+import { TENANT_AUTH } from '@common/swagger.constants';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { CreateClientUserDto } from './dto/create-client-user.dto';
 
+@ApiTags('Clientes')
+@ApiSecurity(TENANT_AUTH)
 @Controller('v1/clients')
 export class ClientsController {
   constructor(private readonly clients: ClientsService) {}

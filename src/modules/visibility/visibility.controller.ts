@@ -7,9 +7,13 @@ import {
   ParseUUIDPipe,
   Query,
 } from '@nestjs/common';
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { CurrentTenant } from '@common/tenant/current-tenant.decorator';
+import { TENANT_AUTH } from '@common/swagger.constants';
 import { VisibilityService } from './visibility.service';
 
+@ApiTags('Visibilidad')
+@ApiSecurity(TENANT_AUTH)
 @Controller('v1/visibility')
 export class VisibilityController {
   constructor(private readonly visibility: VisibilityService) {}

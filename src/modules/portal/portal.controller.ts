@@ -1,4 +1,6 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { PORTAL_AUTH } from '@common/swagger.constants';
 import { CurrentClient } from './current-client.decorator';
 import { PortalStore } from './portal-context';
 import { PortalService } from './portal.service';
@@ -8,6 +10,8 @@ import { OperationStatus } from '@modules/operations/entities/operation.entity';
  * Portal de cliente (E4). Todas las rutas resuelven el cliente desde el usuario
  * autenticado (PortalContext); el cliente solo ve lo suyo.
  */
+@ApiTags('Portal de cliente')
+@ApiSecurity(PORTAL_AUTH)
 @Controller('portal')
 export class PortalController {
   constructor(private readonly portal: PortalService) {}

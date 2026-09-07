@@ -9,13 +9,17 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { CurrentTenant } from '@common/tenant/current-tenant.decorator';
+import { TENANT_AUTH } from '@common/swagger.constants';
 import { BillingService } from './billing.service';
 import { CreateRateCardDto } from './dto/create-rate-card.dto';
 import { AddChargeDto } from './dto/add-charge.dto';
 import { GenerateInvoiceDto } from './dto/generate-invoice.dto';
 import { RegisterCarrierInvoiceDto } from './dto/register-carrier-invoice.dto';
 
+@ApiTags('Facturación')
+@ApiSecurity(TENANT_AUTH)
 @Controller('v1')
 export class BillingController {
   constructor(private readonly billing: BillingService) {}
