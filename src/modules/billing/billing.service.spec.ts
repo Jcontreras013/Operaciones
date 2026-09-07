@@ -12,8 +12,11 @@ function build() {
   const charges = { save: jest.fn().mockImplementation((c) => Promise.resolve({ id: 'ch1', ...c })) };
   const invoices = {};
   const invoiceLines = {};
+  const costs = { find: jest.fn() };
+  const carrierInvoices = { find: jest.fn(), findOne: jest.fn() };
+  const carrierInvoiceLines = { find: jest.fn() };
   const operations = { get: jest.fn() };
-  const dataSource = {};
+  const dataSource: { transaction?: jest.Mock } = {};
 
   const service = new BillingService(
     rateCards as never,
@@ -21,10 +24,23 @@ function build() {
     charges as never,
     invoices as never,
     invoiceLines as never,
+    costs as never,
+    carrierInvoices as never,
+    carrierInvoiceLines as never,
     operations as never,
     dataSource as never,
   );
-  return { service, rateCards, rateRules, charges, operations };
+  return {
+    service,
+    rateCards,
+    rateRules,
+    charges,
+    costs,
+    carrierInvoices,
+    carrierInvoiceLines,
+    operations,
+    dataSource,
+  };
 }
 
 describe('BillingService.createCharge', () => {
@@ -82,5 +98,61 @@ describe('BillingService.createCharge', () => {
         quantity: 1,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('BillingService.getOperationFinancials', () => {
+  it('calcula margen = ingresos − costos', async () => {
+    const { service, charges, costs, operations } = build();
+    operations.get.mockResolvedValue({ id: operationId });
+    (charges as { find?: jest.Mock }).find = jest.fn().mockResolvedValue([
+      { amountMinor: '50000' },
+      { amountMinor: '1500' },
+    ]);
+    costs.find.mockResolvedValue([{ amountMinor: '30000' }]);
+
+    const result = await service.getOperationFinancials(tenantId, operationId);
+
+    expect(result).toEqual({ revenueMinor: '51500', costMinor: '30000', marginMinor: '21500' });
+  });
+});
+
+describe('BillingService.reconcileCarrierInvoice', () => {
+  it('marca DISPUTED y calcula la variación cuando el carrier cobra de más', async () => {
+    const { service, carrierInvoices, carrierInvoiceLines, costs, dataSource } = build();
+    const invoice = { id: 'ci1', supplier: 'Naviera', status: 'pending', reconciledAt: null };
+    carrierInvoices.findOne.mockResolvedValue(invoice);
+    const line = { operationId: 'op1', declaredMinor: '30000', recordedMinor: null, varianceMinor: null };
+    carrierInvoiceLines.find.mockResolvedValue([line]);
+    // Costo registrado para op1 + Naviera = 28000 → variación 2000.
+    costs.find.mockResolvedValue([{ amountMinor: '28000' }]);
+    dataSource.transaction = jest.fn().mockImplementation(async (cb: (m: unknown) => unknown) =>
+      cb({ getRepository: () => ({ save: jest.fn() }) }),
+    );
+
+    const report = await service.reconcileCarrierInvoice(tenantId, 'ci1', 0);
+
+    expect(line.recordedMinor).toBe('28000');
+    expect(line.varianceMinor).toBe('2000');
+    expect(report.discrepancies).toBe(1);
+    expect(report.totalVarianceMinor).toBe('2000');
+    expect(invoice.status).toBe('disputed');
+  });
+
+  it('marca RECONCILED cuando la variación cae dentro de la tolerancia', async () => {
+    const { service, carrierInvoices, carrierInvoiceLines, costs, dataSource } = build();
+    const invoice = { id: 'ci2', supplier: 'Naviera', status: 'pending', reconciledAt: null };
+    carrierInvoices.findOne.mockResolvedValue(invoice);
+    const line = { operationId: 'op1', declaredMinor: '30000', recordedMinor: null, varianceMinor: null };
+    carrierInvoiceLines.find.mockResolvedValue([line]);
+    costs.find.mockResolvedValue([{ amountMinor: '29900' }]); // variación 100
+    dataSource.transaction = jest.fn().mockImplementation(async (cb: (m: unknown) => unknown) =>
+      cb({ getRepository: () => ({ save: jest.fn() }) }),
+    );
+
+    const report = await service.reconcileCarrierInvoice(tenantId, 'ci2', 100); // tolerancia 100
+
+    expect(report.discrepancies).toBe(0);
+    expect(invoice.status).toBe('reconciled');
   });
 });

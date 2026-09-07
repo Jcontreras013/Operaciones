@@ -1,9 +1,20 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Get,
+  Param,
+  ParseIntPipe,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { CurrentTenant } from '@common/tenant/current-tenant.decorator';
 import { BillingService } from './billing.service';
 import { CreateRateCardDto } from './dto/create-rate-card.dto';
 import { AddChargeDto } from './dto/add-charge.dto';
 import { GenerateInvoiceDto } from './dto/generate-invoice.dto';
+import { RegisterCarrierInvoiceDto } from './dto/register-carrier-invoice.dto';
 
 @Controller('v1')
 export class BillingController {
@@ -77,5 +88,53 @@ export class BillingController {
   @Post('invoices/:id/issue')
   issueInvoice(@CurrentTenant() tenantId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.billing.issueInvoice(tenantId, id);
+  }
+
+  // --- Conciliación de facturas de carrier (US3.4) ---
+
+  @Post('carrier-invoices')
+  registerCarrierInvoice(
+    @CurrentTenant() tenantId: string,
+    @Body() dto: RegisterCarrierInvoiceDto,
+  ) {
+    return this.billing.registerCarrierInvoice(tenantId, dto);
+  }
+
+  @Get('carrier-invoices')
+  listCarrierInvoices(@CurrentTenant() tenantId: string) {
+    return this.billing.listCarrierInvoices(tenantId);
+  }
+
+  @Get('carrier-invoices/:id')
+  getCarrierInvoice(@CurrentTenant() tenantId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.billing.getCarrierInvoice(tenantId, id);
+  }
+
+  @Get('carrier-invoices/:id/lines')
+  carrierInvoiceLines(
+    @CurrentTenant() tenantId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.billing.getCarrierInvoiceLines(tenantId, id);
+  }
+
+  /** Concilia contra los costos registrados. `toleranceMinor` admite variaciones menores. */
+  @Post('carrier-invoices/:id/reconcile')
+  reconcileCarrierInvoice(
+    @CurrentTenant() tenantId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('toleranceMinor', new DefaultValuePipe(0), ParseIntPipe) toleranceMinor: number,
+  ) {
+    return this.billing.reconcileCarrierInvoice(tenantId, id, toleranceMinor);
+  }
+
+  // --- Margen por operación (soporta la verificación antes de facturar) ---
+
+  @Get('operations/:id/financials')
+  operationFinancials(
+    @CurrentTenant() tenantId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.billing.getOperationFinancials(tenantId, id);
   }
 }

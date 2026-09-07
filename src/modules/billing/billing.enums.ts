@@ -21,9 +21,19 @@ export enum RateUnit {
   PER_UNIT = 'per_unit',
 }
 
-/** Estado de una factura. */
+/** Estado de una factura al cliente. */
 export enum InvoiceStatus {
   DRAFT = 'draft',
   APPROVED = 'approved',
   ISSUED = 'issued',
+}
+
+/** Estado de una factura recibida de un carrier (US3.4). */
+export enum CarrierInvoiceStatus {
+  /** Registrada, aún sin conciliar. */
+  PENDING = 'pending',
+  /** Conciliada sin discrepancias (dentro de la tolerancia). */
+  RECONCILED = 'reconciled',
+  /** Conciliada con discrepancias respecto a los costos registrados. */
+  DISPUTED = 'disputed',
 }

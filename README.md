@@ -89,6 +89,9 @@ Ejemplos de uso de la API en [`requests.http`](./requests.http).
   los cargos se **derivan de los eventos** de la operación, nunca por re-captura —
   `per_service` al crear, `handling` al llegar a un estado, y `storage` calculado por días al
   entregar. Generación de facturas draft → aprobar → emitir, con montos en enteros (sin floats).
+  Incluye **conciliación de facturas de carrier** (US3.4): registrar la factura del proveedor
+  y conciliarla contra los costos registrados (`reconciled`/`disputed` según variación y
+  tolerancia), más el **margen por operación** (ingresos − costos) para verificar antes de facturar.
 - **Torre de visibilidad** (E5): lado de lectura sobre el registro único y la facturación —
   tablero con conteo por estado, alertas de excepción (`stale`: operación abierta sin actividad;
   `missing_pod`: entrega sin prueba de entrega) y KPIs por cliente (activas, entregadas,
@@ -101,6 +104,5 @@ Ejemplos de uso de la API en [`requests.http`](./requests.http).
 
 ### Pendiente (próximos sprints de Fase 0)
 
-Conciliación de facturas de carrier vs. margen (US3.4) y export a ERP (US3.5); API pública
-documentada y auth OAuth2/OIDC real (E6, hoy los headers `x-tenant-id`/`x-client-user-id`
-son el stub de sesión).
+Export de facturas a ERP (US3.5); API pública documentada (Swagger/OpenAPI) y auth
+OAuth2/OIDC real (E6, hoy los headers `x-tenant-id`/`x-client-user-id` son el stub de sesión).

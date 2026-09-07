@@ -159,6 +159,40 @@ x-tenant-id: {{tenantId}}
 POST {{baseUrl}}/v1/invoices/REEMPLAZAR_INVOICE_ID/issue
 x-tenant-id: {{tenantId}}
 
+### --- CONCILIACIÓN DE CARRIER (US3.4) ---
+
+### C1. Registrar factura recibida de un carrier (una línea por operación)
+POST {{baseUrl}}/v1/carrier-invoices
+Content-Type: application/json
+x-tenant-id: {{tenantId}}
+
+{
+  "supplier": "Naviera XYZ",
+  "number": "NAV-9001",
+  "currency": "USD",
+  "lines": [
+    { "operationId": "REEMPLAZAR_OPERATION_ID", "concept": "Flete", "declaredMinor": 30000 }
+  ]
+}
+
+### C2. Conciliar contra los costos registrados (tolerancia 0 por defecto)
+# Compara lo declarado por el carrier vs. la suma de CostItem de esa operación
+# para el mismo proveedor. Marca reconciled o disputed.
+POST {{baseUrl}}/v1/carrier-invoices/REEMPLAZAR_CARRIER_INVOICE_ID/reconcile
+x-tenant-id: {{tenantId}}
+
+### C2b. Conciliar admitiendo variaciones menores (tolerancia en menor unidad)
+POST {{baseUrl}}/v1/carrier-invoices/REEMPLAZAR_CARRIER_INVOICE_ID/reconcile?toleranceMinor=2000
+x-tenant-id: {{tenantId}}
+
+### C3. Ver factura de carrier y sus líneas (con variación tras conciliar)
+GET {{baseUrl}}/v1/carrier-invoices/REEMPLAZAR_CARRIER_INVOICE_ID/lines
+x-tenant-id: {{tenantId}}
+
+### C4. Margen de una operación (verificación antes de facturar)
+GET {{baseUrl}}/v1/operations/REEMPLAZAR_OPERATION_ID/financials
+x-tenant-id: {{tenantId}}
+
 ### --- TORRE DE VISIBILIDAD (E5) ---
 
 ### 17. Tablero: conteo por estado + operaciones recientes

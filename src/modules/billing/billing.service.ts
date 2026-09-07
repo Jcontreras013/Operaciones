@@ -3,15 +3,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Between, DataSource, In, IsNull, Repository } from 'typeorm';
 import { Money } from '@common/money';
 import { OperationsService } from '@modules/operations/operations.service';
+import { CostItem } from '@modules/operations/entities/cost-item.entity';
 import { RateCard } from './entities/rate-card.entity';
 import { RateRule } from './entities/rate-rule.entity';
 import { ChargeItem } from './entities/charge-item.entity';
 import { Invoice } from './entities/invoice.entity';
 import { InvoiceLine } from './entities/invoice-line.entity';
-import { InvoiceStatus } from './billing.enums';
+import { CarrierInvoice } from './entities/carrier-invoice.entity';
+import { CarrierInvoiceLine } from './entities/carrier-invoice-line.entity';
+import { CarrierInvoiceStatus, InvoiceStatus } from './billing.enums';
 import { CreateRateCardDto } from './dto/create-rate-card.dto';
 import { AddChargeDto } from './dto/add-charge.dto';
 import { GenerateInvoiceDto } from './dto/generate-invoice.dto';
+import { RegisterCarrierInvoiceDto } from './dto/register-carrier-invoice.dto';
 
 @Injectable()
 export class BillingService {
@@ -21,6 +25,11 @@ export class BillingService {
     @InjectRepository(ChargeItem) private readonly charges: Repository<ChargeItem>,
     @InjectRepository(Invoice) private readonly invoices: Repository<Invoice>,
     @InjectRepository(InvoiceLine) private readonly invoiceLines: Repository<InvoiceLine>,
+    @InjectRepository(CostItem) private readonly costs: Repository<CostItem>,
+    @InjectRepository(CarrierInvoice)
+    private readonly carrierInvoices: Repository<CarrierInvoice>,
+    @InjectRepository(CarrierInvoiceLine)
+    private readonly carrierInvoiceLines: Repository<CarrierInvoiceLine>,
     private readonly operations: OperationsService,
     private readonly dataSource: DataSource,
   ) {}
@@ -272,5 +281,157 @@ export class BillingService {
 
   getInvoiceLines(tenantId: string, invoiceId: string): Promise<InvoiceLine[]> {
     return this.invoiceLines.find({ where: { tenantId, invoiceId } });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Conciliación de facturas de carrier (US3.4)
+  // ---------------------------------------------------------------------------
+
+  /** Registra una factura de carrier con sus líneas (una por operación). */
+  async registerCarrierInvoice(
+    tenantId: string,
+    dto: RegisterCarrierInvoiceDto,
+  ): Promise<CarrierInvoice> {
+    // Valida que cada operación pertenezca al tenant.
+    for (const line of dto.lines) {
+      await this.operations.get(tenantId, line.operationId);
+    }
+    const currency = dto.currency ?? 'USD';
+    const declaredMinor = Money.sum(dto.lines.map((l) => String(l.declaredMinor)));
+
+    return this.dataSource.transaction(async (manager) => {
+      const invoice = await manager.getRepository(CarrierInvoice).save({
+        tenantId,
+        supplier: dto.supplier,
+        number: dto.number,
+        currency,
+        declaredMinor,
+        status: CarrierInvoiceStatus.PENDING,
+        reconciledAt: null,
+        note: null,
+      });
+
+      await manager.getRepository(CarrierInvoiceLine).save(
+        dto.lines.map((l) => ({
+          tenantId,
+          carrierInvoiceId: invoice.id,
+          operationId: l.operationId,
+          concept: l.concept,
+          declaredMinor: String(l.declaredMinor),
+          recordedMinor: null,
+          varianceMinor: null,
+        })),
+      );
+
+      return invoice;
+    });
+  }
+
+  /**
+   * Concilia una factura de carrier contra los costos registrados (US3.4).
+   * Para cada línea compara lo declarado por el carrier con la suma de los
+   * CostItem de esa operación para el mismo proveedor, y calcula la variación.
+   * Marca la factura RECONCILED si toda variación cae dentro de la tolerancia,
+   * o DISPUTED si hay discrepancias.
+   */
+  async reconcileCarrierInvoice(
+    tenantId: string,
+    id: string,
+    toleranceMinor = 0,
+  ): Promise<{
+    invoice: CarrierInvoice;
+    lines: CarrierInvoiceLine[];
+    totalDeclaredMinor: string;
+    totalRecordedMinor: string;
+    totalVarianceMinor: string;
+    discrepancies: number;
+  }> {
+    const invoice = await this.getCarrierInvoice(tenantId, id);
+    const lines = await this.carrierInvoiceLines.find({
+      where: { tenantId, carrierInvoiceId: id },
+      order: { createdAt: 'ASC' },
+    });
+
+    const tolerance = BigInt(toleranceMinor);
+    let discrepancies = 0;
+
+    await this.dataSource.transaction(async (manager) => {
+      for (const line of lines) {
+        const recorded = await this.sumCostForOperationSupplier(
+          tenantId,
+          line.operationId,
+          invoice.supplier,
+        );
+        const variance = BigInt(line.declaredMinor) - BigInt(recorded);
+        line.recordedMinor = recorded;
+        line.varianceMinor = variance.toString();
+        if (variance > tolerance || variance < -tolerance) {
+          discrepancies += 1;
+        }
+        await manager.getRepository(CarrierInvoiceLine).save(line);
+      }
+
+      invoice.status =
+        discrepancies === 0 ? CarrierInvoiceStatus.RECONCILED : CarrierInvoiceStatus.DISPUTED;
+      invoice.reconciledAt = new Date();
+      await manager.getRepository(CarrierInvoice).save(invoice);
+    });
+
+    return {
+      invoice,
+      lines,
+      totalDeclaredMinor: Money.sum(lines.map((l) => l.declaredMinor)),
+      totalRecordedMinor: Money.sum(lines.map((l) => l.recordedMinor ?? '0')),
+      totalVarianceMinor: Money.sum(lines.map((l) => l.varianceMinor ?? '0')),
+      discrepancies,
+    };
+  }
+
+  listCarrierInvoices(tenantId: string): Promise<CarrierInvoice[]> {
+    return this.carrierInvoices.find({ where: { tenantId }, order: { createdAt: 'DESC' } });
+  }
+
+  async getCarrierInvoice(tenantId: string, id: string): Promise<CarrierInvoice> {
+    const invoice = await this.carrierInvoices.findOne({ where: { tenantId, id } });
+    if (!invoice) {
+      throw new NotFoundException('Factura de carrier no encontrada');
+    }
+    return invoice;
+  }
+
+  getCarrierInvoiceLines(tenantId: string, carrierInvoiceId: string): Promise<CarrierInvoiceLine[]> {
+    return this.carrierInvoiceLines.find({
+      where: { tenantId, carrierInvoiceId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  /**
+   * Situación financiera de una operación (soporta la verificación de margen
+   * antes de facturar): ingresos (cargos) − costos = margen.
+   */
+  async getOperationFinancials(
+    tenantId: string,
+    operationId: string,
+  ): Promise<{ revenueMinor: string; costMinor: string; marginMinor: string }> {
+    await this.operations.get(tenantId, operationId); // valida pertenencia
+    const [charges, costs] = await Promise.all([
+      this.charges.find({ where: { tenantId, operationId } }),
+      this.costs.find({ where: { tenantId, operationId } }),
+    ]);
+    const revenueMinor = Money.sum(charges.map((c) => c.amountMinor));
+    const costMinor = Money.sum(costs.map((c) => c.amountMinor));
+    const marginMinor = (BigInt(revenueMinor) - BigInt(costMinor)).toString();
+    return { revenueMinor, costMinor, marginMinor };
+  }
+
+  /** Suma de los CostItem de una operación para un proveedor dado. */
+  private async sumCostForOperationSupplier(
+    tenantId: string,
+    operationId: string,
+    supplier: string,
+  ): Promise<string> {
+    const items = await this.costs.find({ where: { tenantId, operationId, supplier } });
+    return Money.sum(items.map((c) => c.amountMinor));
   }
 }
