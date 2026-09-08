@@ -37,6 +37,7 @@ src/
 │  ├─ portal/        E4 · Portal de cliente (auth propia, solo-lectura)
 │  ├─ warehouse/     Fase 1 · WMS: almacenes, ubicaciones, inventario, movimientos
 │  ├─ delivery/      Fase 1 · TMS/última milla: flota, rutas, optimización, POD
+│  ├─ field/         Migración monitor · ingesta de órdenes telecom (Cepheus)
 │  ├─ auth/          E6 · Autenticación JWT (login operador y portal)
 │  └─ events/        E6 · Bus de eventos (patrón outbox)
 └─ health/           Health check
@@ -155,6 +156,15 @@ inventario (WMS) y rutas (última milla); portal de cliente y app del conductor 
   regla correspondiente de la rate card (las reglas *de actividad* son las que no tienen
   `triggerStatus`). Los cargos de actividad pueden no estar atados a una operación y guardan su
   `source`. Verificado: recepción×20 → 2000, pick×5 → 250, entrega → 4000, todo automático.
+
+## Migración del Monitor Operativo (unificación)
+
+Plan en [`docs/migracion-monitor-operativo.md`](./docs/migracion-monitor-operativo.md).
+**Fase A entregada** (módulo `field`): ingesta de órdenes telecom desde la API **Cepheus** a
+PostgreSQL, con un **conector enchufable** (stub en Fase A → adaptador HTTP real con
+credenciales por env var), upsert idempotente por `NUM`, registro de corridas (`ingest_runs`)
+y consulta/filtrado de órdenes. Reemplaza al `sync_job.py` del monitor. Próximo: la vista
+"Monitor diario" en React (Fase B).
 
 ## Despliegue
 

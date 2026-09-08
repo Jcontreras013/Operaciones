@@ -10,6 +10,7 @@ import { BillingModule } from '@modules/billing/billing.module';
 import { VisibilityModule } from '@modules/visibility/visibility.module';
 import { WarehouseModule } from '@modules/warehouse/warehouse.module';
 import { DeliveryModule } from '@modules/delivery/delivery.module';
+import { FieldModule } from '@modules/field/field.module';
 import { PortalModule } from '@modules/portal/portal.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { HealthController } from './health/health.controller';
@@ -27,6 +28,7 @@ import { HealthController } from './health/health.controller';
     VisibilityModule,
     WarehouseModule,
     DeliveryModule,
+    FieldModule,
     PortalModule,
   ],
   controllers: [HealthController],
