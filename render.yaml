@@ -1,10 +1,18 @@
 # Render Blueprint — despliega el backend (API) y el frontend (consola).
-# La base de datos es un PostgreSQL externo (Neon): se conecta por DATABASE_URL,
-# que se pega en el panel de Render (secreta).
+# PostgreSQL gestionado por Render: DATABASE_URL se cablea solo al backend
+# (no hay que copiar cadena de conexión ni crear cuentas externas). Plan free:
+# 1 GB. Para migrar a un Postgres externo más adelante, basta cambiar
+# DATABASE_URL en el panel.
 #
-# Uso: en Render, New > Blueprint, apunta a este repositorio. Render crea los
-# dos servicios. Completa las variables `sync: false` (DATABASE_URL y las URLs)
-# en el panel. Ver docs/deploy.md.
+# Uso: en Render, New > Blueprint, apunta a este repositorio. Render crea la
+# base y los dos servicios. Solo completas las URLs (`sync: false`) tras el
+# primer deploy. Ver docs/deploy.md.
+
+databases:
+  - name: operaciones-db
+    plan: free
+    databaseName: operaciones
+    user: operaciones
 
 services:
   # ---------------- Backend (NestJS) ----------------
@@ -16,10 +24,11 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
-      # Cadena de conexión de Neon (Postgres externo). Secreta: se pega en el
-      # panel de Render.
+      # Cadena de conexión del Postgres de Render (cableada automáticamente).
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: operaciones-db
+          property: connectionString
       - key: DATABASE_SSL
         value: 'true'
       - key: DATABASE_SYNCHRONIZE
