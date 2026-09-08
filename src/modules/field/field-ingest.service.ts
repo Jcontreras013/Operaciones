@@ -148,4 +148,51 @@ export class FieldIngestService {
   listRuns(tenantId: string): Promise<IngestRun[]> {
     return this.runs.find({ where: { tenantId }, order: { createdAt: 'DESC' }, take: 50 });
   }
+
+  /** Tablero del monitor: totales y agregados por estado, actividad y técnico. */
+  async getBoard(tenantId: string): Promise<{
+    total: number;
+    byEstado: { key: string; count: number }[];
+    byActividad: { key: string; count: number }[];
+    byTecnico: { key: string; count: number }[];
+    lastIngest: { ranAt: string; fetched: number; status: string } | null;
+  }> {
+    const total = await this.orders.count({ where: { tenantId } });
+    const [byEstado, byActividad, byTecnico] = await Promise.all([
+      this.groupCount(tenantId, 'estado'),
+      this.groupCount(tenantId, 'actividad'),
+      this.groupCount(tenantId, 'tecnico', 10),
+    ]);
+    const run = await this.runs.findOne({
+      where: { tenantId },
+      order: { createdAt: 'DESC' },
+    });
+    return {
+      total,
+      byEstado,
+      byActividad,
+      byTecnico,
+      lastIngest: run
+        ? { ranAt: run.createdAt.toISOString(), fetched: run.fetched, status: run.status }
+        : null,
+    };
+  }
+
+  /** Conteo agrupado por una columna, ordenado desc; los null se muestran como '(sin dato)'. */
+  private async groupCount(
+    tenantId: string,
+    column: 'estado' | 'actividad' | 'tecnico',
+    limit?: number,
+  ): Promise<{ key: string; count: number }[]> {
+    const qb = this.orders
+      .createQueryBuilder('o')
+      .select(`COALESCE(o.${column}, '(sin dato)')`, 'key')
+      .addSelect('COUNT(*)', 'count')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .groupBy(`COALESCE(o.${column}, '(sin dato)')`)
+      .orderBy('count', 'DESC');
+    if (limit) qb.limit(limit);
+    const rows = await qb.getRawMany<{ key: string; count: string }>();
+    return rows.map((r) => ({ key: r.key, count: Number(r.count) }));
+  }
 }

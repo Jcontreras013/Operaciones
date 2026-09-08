@@ -3,6 +3,7 @@ import { useAuth } from '@/auth/AuthContext';
 
 const NAV = [
   { to: '/', label: 'Tablero', end: true },
+  { to: '/monitor', label: 'Monitor' },
   { to: '/clients', label: 'Clientes' },
   { to: '/operations', label: 'Operaciones' },
 ];

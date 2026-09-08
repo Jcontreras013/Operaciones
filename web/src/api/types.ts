@@ -61,3 +61,40 @@ export interface ExceptionRow {
   status: OperationStatus;
   detail: string;
 }
+
+// --- Campo / Monitor (órdenes telecom) ---
+
+export interface WorkOrder {
+  id: string;
+  externalNum: string;
+  cliente: string | null;
+  tecnico: string | null;
+  actividad: string | null;
+  estado: string | null;
+  olt: string | null;
+  pon: string | null;
+  colonia: string | null;
+  causa: string | null;
+  fechaApe: string | null;
+  fechaApeRaw: string | null;
+}
+
+export interface FieldGroup {
+  key: string;
+  count: number;
+}
+
+export interface FieldBoard {
+  total: number;
+  byEstado: FieldGroup[];
+  byActividad: FieldGroup[];
+  byTecnico: FieldGroup[];
+  lastIngest: { ranAt: string; fetched: number; status: string } | null;
+}
+
+export interface IngestResult {
+  fetched: number;
+  created: number;
+  updated: number;
+  runId: string;
+}
