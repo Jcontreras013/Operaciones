@@ -3,6 +3,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { Layout } from '@/components/Layout';
 import { LoginPage } from '@/pages/LoginPage';
 import { DashboardPage } from '@/pages/DashboardPage';
+import { MonitorPage } from '@/pages/MonitorPage';
 import { ClientsPage } from '@/pages/ClientsPage';
 import { OperationsPage } from '@/pages/OperationsPage';
 import { OperationDetailPage } from '@/pages/OperationDetailPage';
@@ -24,6 +25,7 @@ export function App() {
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route element={<Layout />}>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/monitor" element={<MonitorPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/operations" element={<OperationsPage />} />
         <Route path="/operations/:id" element={<OperationDetailPage />} />

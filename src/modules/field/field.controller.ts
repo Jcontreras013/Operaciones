@@ -20,6 +20,12 @@ export class FieldController {
     return this.ingest.ingest(tenantId, from);
   }
 
+  /** Tablero del monitor (totales + agregados por estado/actividad/técnico). */
+  @Get('board')
+  board(@CurrentTenant() tenantId: string) {
+    return this.ingest.getBoard(tenantId);
+  }
+
   @Get('work-orders')
   listWorkOrders(
     @CurrentTenant() tenantId: string,
