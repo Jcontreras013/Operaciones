@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Tenant } from '@modules/tenancy/entities/tenant.entity';
 import { WorkOrder } from './entities/work-order.entity';
 import { IngestRun } from './entities/ingest-run.entity';
+import { TechnicianLunch } from './entities/technician-lunch.entity';
 import { FieldIngestService } from './field-ingest.service';
 import { FieldIngestScheduler } from './field-ingest.scheduler';
 import { FieldController } from './field.controller';
@@ -21,7 +22,7 @@ import { HttpCepheusConnector } from './cepheus/http-cepheus.connector';
  * del monitor) — necesita `Tenant` para recorrer los tenants activos.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([WorkOrder, IngestRun, Tenant])],
+  imports: [TypeOrmModule.forFeature([WorkOrder, IngestRun, TechnicianLunch, Tenant])],
   providers: [
     FieldIngestService,
     FieldIngestScheduler,
