@@ -456,5 +456,57 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/v1/field/offline?days=90
 Authorization: Bearer {{token}}
 
+### --- CALIDAD: ENCUESTA DE CONTROL POST-SERVICIO (migración, Fase D) ---
+
+### Q1. Registrar gestión de llamada — encuesta completa (contactResult=contestada)
+POST {{baseUrl}}/v1/quality/surveys
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "workOrderId": "REEMPLAZAR_WORK_ORDER_ID",
+  "contactResult": "contestada",
+  "p1Puntualidad": 5,
+  "p2PresentacionTrato": 5,
+  "p3ClaridadExplicacion": 4,
+  "p4NoAplica": false,
+  "p4TvCcveo": 4,
+  "p5CalidadServicio": 5,
+  "p6Limpieza": 4,
+  "p7Satisfaccion": 5,
+  "aprobacionInterna": "aprobado",
+  "comentarioMejora": "Ninguna",
+  "firmante": "Nombre del cliente"
+}
+
+### Q2. Registrar gestión sin contacto, con seguimiento
+POST {{baseUrl}}/v1/quality/surveys
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "workOrderId": "REEMPLAZAR_WORK_ORDER_ID",
+  "contactResult": "numero_equivocado",
+  "requiereSeguimiento": true,
+  "seguimientoTicket": "TCK-1001",
+  "seguimientoResponsable": "Miguel",
+  "seguimientoFechaLimite": "2026-09-20"
+}
+
+### Q3. Listar encuestas (filtros: workOrderId, contactResult, pendientes=true)
+GET {{baseUrl}}/v1/quality/surveys?pendientes=true
+Authorization: Bearer {{token}}
+
+### Q4. Marcar un seguimiento como resuelto
+PATCH {{baseUrl}}/v1/quality/surveys/REEMPLAZAR_SURVEY_ID/seguimiento
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "resuelto": true }
+
+### Q5. Reporte de calidad: CSAT oficial (P7), diagnóstico (P1-P6) y seguimientos pendientes
+GET {{baseUrl}}/v1/quality/report?days=30
+Authorization: Bearer {{token}}
+
 ### Health check (público)
 GET {{baseUrl}}/health

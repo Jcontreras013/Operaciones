@@ -101,7 +101,10 @@ El **frontend** agrega estas vistas a la consola React ya existente (mismo shell
   abiertos, diagnóstico de causa raíz (con falsos positivos) sobre los ya cerrados, y mapa de
   concentración de fallas por OLT/PON. Ruta `/red`; lógica portada de `tools.py` en
   `src/modules/field/offline.ts`.
-- **Fase D — Calidad, auditoría, reportes.**
+- ✅ **Fase D — Calidad, auditoría, reportes.** Módulo `quality`: encuesta post-servicio (6
+  resultados de contacto + 7 preguntas cuando contestan, P4 con "No aplica"), CSAT oficial sobre
+  P7, diagnóstico por pregunta (P1-P6), y seguimientos (ticket/responsable/fecha límite) con
+  listado de pendientes. Sin envío por WhatsApp/WATI (servicio de paga sin usar). Ruta `/calidad`.
 - **Fase E — Biometría, expedientes/OCR, vehículos.**
 - **Fase F — Corte final** y apagado del Streamlit.
 

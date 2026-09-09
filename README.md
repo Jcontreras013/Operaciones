@@ -177,8 +177,17 @@ Plan en [`docs/migracion-monitor-operativo.md`](./docs/migracion-monitor-operati
   los ya cerrados; mapa de concentración de fallas por OLT y por PON. Portado 1:1 de la lógica de
   `tools.py` (`calcular_offline_y_alertas`, `clasificar_causa_offline`) — ver `src/modules/field/
   offline.ts` (`GET /v1/field/offline`, con `?days=` para la ventana del diagnóstico).
+- **Fase D — Calidad** (módulo `quality`, React ruta `/calidad`): encuesta de control
+  post-servicio (reemplaza la pestaña "Registrar Gestión de Llamada" de `ccalidad.py` — sin envío
+  por WhatsApp/WATI, es un servicio de paga que no se está usando). 6 resultados de contacto
+  posibles + la encuesta de 7 preguntas (escala 1-5) cuando sí contestan; P4 (TV Cable/CCVEO)
+  admite "No aplica". Indicador oficial: **CSAT = % de respuestas con P7 en {4,5}** sobre el total
+  de llamadas contestadas; P1-P6 son diagnóstico (promedio por pregunta, para saber exactamente
+  qué mejorar). "Requiere seguimiento" es independiente del resultado de la llamada — ticket,
+  responsable y fecha límite, con listado de pendientes y endpoint para resolverlos.
+  `GET /v1/quality/report?days=` para el reporte completo.
 
-Próximo: calidad y reportes (Fase D).
+Próximo: biometría, expedientes y vehículos (Fase E).
 
 ## Despliegue
 

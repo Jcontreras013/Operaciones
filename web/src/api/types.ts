@@ -118,3 +118,79 @@ export interface IngestResult {
   updated: number;
   runId: string;
 }
+
+// --- Calidad (encuesta de control post-servicio) ---
+
+export type ContactResult =
+  | 'contestada'
+  | 'cliente_no_desea_participar'
+  | 'responsable_no_disponible'
+  | 'llamada_reprogramada'
+  | 'numero_equivocado'
+  | 'sin_respuesta_dos_intentos';
+
+export type AprobacionInterna = 'aprobado' | 'con_observaciones' | 'no_aprobado';
+
+export interface QualitySurvey {
+  id: string;
+  workOrderId: string;
+  externalNum: string;
+  cliente: string | null;
+  tecnico: string | null;
+  actividad: string | null;
+  contactResult: ContactResult;
+  p1Puntualidad: number | null;
+  p2PresentacionTrato: number | null;
+  p3ClaridadExplicacion: number | null;
+  p4NoAplica: boolean;
+  p4TvCcveo: number | null;
+  p5CalidadServicio: number | null;
+  p6Limpieza: number | null;
+  p7Satisfaccion: number | null;
+  comentarioMejora: string | null;
+  aprobacionInterna: AprobacionInterna | null;
+  firmante: string | null;
+  requiereSeguimiento: boolean;
+  seguimientoTicket: string | null;
+  seguimientoResponsable: string | null;
+  seguimientoFechaLimite: string | null;
+  seguimientoResuelto: boolean;
+  createdAt: string;
+}
+
+export interface CreateQualitySurveyInput {
+  workOrderId: string;
+  contactResult: ContactResult;
+  p1Puntualidad?: number;
+  p2PresentacionTrato?: number;
+  p3ClaridadExplicacion?: number;
+  p4NoAplica?: boolean;
+  p4TvCcveo?: number;
+  p5CalidadServicio?: number;
+  p6Limpieza?: number;
+  p7Satisfaccion?: number;
+  comentarioMejora?: string;
+  aprobacionInterna?: AprobacionInterna;
+  firmante?: string;
+  requiereSeguimiento?: boolean;
+  seguimientoTicket?: string;
+  seguimientoResponsable?: string;
+  seguimientoFechaLimite?: string;
+}
+
+export interface QualityDiagnosticoItem {
+  campo: string;
+  etiqueta: string;
+  promedio: number | null;
+  respuestas: number;
+}
+
+export interface QualityReport {
+  desde: string;
+  totalGestiones: number;
+  porResultado: FieldGroup[];
+  totalRespuestasValidas: number;
+  csat: number | null;
+  diagnostico: QualityDiagnosticoItem[];
+  seguimientosPendientes: QualitySurvey[];
+}
