@@ -4,6 +4,7 @@ import { api } from '@/api/client';
 import type { FieldBoard, GanttRow, IngestResult, WorkOrder } from '@/api/types';
 import { ErrorBox, Loading, PageHeader } from '@/components/ui';
 import { GanttChart } from '@/components/GanttChart';
+import { MultiSelect } from '@/components/MultiSelect';
 
 function estadoClass(estado: string | null): string {
   const e = (estado ?? '').toUpperCase();
@@ -21,7 +22,11 @@ function hoyHN(): string {
 
 export function MonitorPage() {
   const qc = useQueryClient();
-  const [estado, setEstado] = useState<string | null>(null);
+  const [estado, setEstado] = useState<string[]>([]);
+  const [actividad, setActividad] = useState<string[]>([]);
+  const [motivo, setMotivo] = useState<string[]>([]);
+  const [criticas, setCriticas] = useState(false);
+  const [noAsignadas, setNoAsignadas] = useState(false);
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [fechaGantt, setFechaGantt] = useState(hoyHN());
@@ -29,10 +34,14 @@ export function MonitorPage() {
   const board = useQuery({ queryKey: ['field-board'], queryFn: () => api<FieldBoard>('/v1/field/board') });
 
   const orders = useQuery({
-    queryKey: ['field-orders', estado, fechaDesde, fechaHasta],
+    queryKey: ['field-orders', estado, actividad, motivo, criticas, noAsignadas, fechaDesde, fechaHasta],
     queryFn: () => {
       const params = new URLSearchParams();
-      if (estado) params.set('estado', estado);
+      if (estado.length) params.set('estado', estado.join(','));
+      if (actividad.length) params.set('actividad', actividad.join(','));
+      if (motivo.length) params.set('motivo', motivo.join(','));
+      if (criticas) params.set('criticas', 'true');
+      if (noAsignadas) params.set('noAsignadas', 'true');
       if (fechaDesde) params.set('from', fechaDesde);
       if (fechaHasta) params.set('to', fechaHasta);
       const qs = params.toString();
@@ -55,6 +64,13 @@ export function MonitorPage() {
   });
 
   const hayFiltroFecha = Boolean(fechaDesde || fechaHasta);
+
+  const filtrosActivos: string[] = [];
+  if (criticas) filtrosActivos.push('🚨 Ver solo Críticas — oculta Plex, PEXTERNO, SPLITTEROPT e instalaciones');
+  if (noAsignadas) filtrosActivos.push('🚨 Ver NO Asignadas — oculta todas las órdenes que ya tienen técnico');
+  if (actividad.length) filtrosActivos.push(`🛠️ Actividad: ${actividad.join(', ')}`);
+  if (estado.length) filtrosActivos.push(`🚦 Estado: ${estado.join(', ')}`);
+  if (motivo.length) filtrosActivos.push(`⚠️ Motivo: ${motivo.join(', ')}`);
 
   return (
     <div>
@@ -99,8 +115,8 @@ export function MonitorPage() {
             <button
               type="button"
               className="tile-btn"
-              onClick={() => setEstado(null)}
-              style={tileStyle(estado === null)}
+              onClick={() => setEstado([])}
+              style={tileStyle(estado.length === 0)}
             >
               <div className="num" style={{ fontFamily: 'Archivo', fontWeight: 900, fontSize: 30, color: 'var(--accent)', lineHeight: 1 }}>
                 {board.data.total}
@@ -112,8 +128,8 @@ export function MonitorPage() {
                 key={g.key}
                 type="button"
                 className="tile-btn"
-                onClick={() => setEstado(g.key === estado ? null : g.key)}
-                style={tileStyle(estado === g.key)}
+                onClick={() => setEstado(estado.length === 1 && estado[0] === g.key ? [] : [g.key])}
+                style={tileStyle(estado.length === 1 && estado[0] === g.key)}
               >
                 <div className="num" style={{ fontFamily: 'Archivo', fontWeight: 900, fontSize: 30, lineHeight: 1 }}>
                   {g.count}
@@ -154,17 +170,21 @@ export function MonitorPage() {
       <section className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: 10 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700 }}>
-            Órdenes {estado && <span className={`badge ${estadoClass(estado)}`} style={{ marginLeft: 8 }}>{estado.toLowerCase()}</span>}
+            Órdenes {estado.length > 0 && <span className={`badge ${estadoClass(estado[0])}`} style={{ marginLeft: 8 }}>{estado.join(', ').toLowerCase()}</span>}
           </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <input className="input" type="date" style={{ width: 'auto' }} value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
             <span className="muted" style={{ fontSize: 13 }}>a</span>
             <input className="input" type="date" style={{ width: 'auto' }} value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
-            {(estado || hayFiltroFecha) && (
+            {(estado.length > 0 || hayFiltroFecha || actividad.length > 0 || motivo.length > 0 || criticas || noAsignadas) && (
               <button
                 className="btn btn-sm"
                 onClick={() => {
-                  setEstado(null);
+                  setEstado([]);
+                  setActividad([]);
+                  setMotivo([]);
+                  setCriticas(false);
+                  setNoAsignadas(false);
                   setFechaDesde('');
                   setFechaHasta('');
                 }}
@@ -174,6 +194,50 @@ export function MonitorPage() {
             )}
           </div>
         </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
+          <span className="muted" style={{ fontSize: 12.5, marginRight: 2 }}>🎛️ Filtros:</span>
+          {board.data && (
+            <>
+              <MultiSelect label="🛠️ Tipo de Actividad" options={board.data.byActividad} selected={actividad} onChange={setActividad} />
+              <MultiSelect label="🚦 Estado de Orden" options={board.data.byEstado} selected={estado} onChange={setEstado} />
+              <MultiSelect label="⚠️ Motivo / Diagnóstico" options={board.data.byMotivo} selected={motivo} onChange={setMotivo} />
+            </>
+          )}
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={criticas ? { borderColor: 'var(--red, #c92a2a)', color: 'var(--red, #c92a2a)' } : undefined}
+            onClick={() => setCriticas((v) => !v)}
+          >
+            🚨 Ver solo Críticas
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={noAsignadas ? { borderColor: 'var(--red, #c92a2a)', color: 'var(--red, #c92a2a)' } : undefined}
+            onClick={() => setNoAsignadas((v) => !v)}
+          >
+            🚨 Ver NO Asignadas
+          </button>
+        </div>
+
+        {filtrosActivos.length > 0 && (
+          <div className="card-pad" style={{ background: 'var(--accent-soft)', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+            <b>Hay filtros activos ocultando información:</b>
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              {filtrosActivos.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+            {orders.data && (
+              <p className="muted" style={{ margin: '6px 0 0' }}>
+                Se están mostrando <b>{orders.data.length}</b> órdenes con estos filtros.
+              </p>
+            )}
+          </div>
+        )}
+
         {orders.isLoading && <Loading />}
         {orders.data && orders.data.length === 0 && (
           <div className="empty">Sin órdenes. Pulsa "Sincronizar ahora" para traerlas de Cepheus.</div>

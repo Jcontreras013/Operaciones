@@ -2,8 +2,10 @@ import {
   categoriaRetraso,
   clasificarTablero,
   diasRetraso,
+  esCritica,
   esEstadoVivo,
   esInstalacion,
+  esNoAsignadaValida,
   esPendienteMonitor,
   esPlex,
   esSop,
@@ -96,6 +98,28 @@ describe('esEstadoVivo / esPendienteMonitor', () => {
 
   it('una orden cerrada nunca es pendiente', () => {
     expect(esPendienteMonitor({ estado: 'CERRADA', tecnico: 'Norman', actividad: 'SOPFIBRA' })).toBe(false);
+  });
+});
+
+describe('esNoAsignadaValida', () => {
+  it('requiere actividad permitida y ausencia de técnico', () => {
+    expect(esNoAsignadaValida('SOPFIBRA', '')).toBe(true);
+    expect(esNoAsignadaValida('SOPFIBRA', 'Norman')).toBe(false);
+    expect(esNoAsignadaValida('ALGO_NO_LISTADO', '')).toBe(false);
+  });
+});
+
+describe('esCritica ("Ver solo Críticas" del Monitor)', () => {
+  it('requiere offline o alerta de tiempo, y que la actividad sea SOP', () => {
+    expect(esCritica('SOPFIBRA', true, false)).toBe(true);
+    expect(esCritica('SOPFIBRA', false, true)).toBe(true);
+    expect(esCritica('SOPFIBRA', false, false)).toBe(false);
+  });
+
+  it('REGRESIÓN: no cuela instalaciones ni Plex aunque mencionen SOP', () => {
+    expect(esCritica('SOPRECONFIBRA', true, false)).toBe(true); // soporte real: sí cuenta
+    expect(esCritica('INSFIBRA', true, false)).toBe(false); // instalación: no es SOP
+    expect(esCritica('PEXTERNO', true, false)).toBe(false); // Plex: excluido explícitamente
   });
 });
 
