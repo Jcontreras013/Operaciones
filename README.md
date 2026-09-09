@@ -206,6 +206,16 @@ metadata, ningún guard los exige), estos tres sí se validan de verdad con `Rol
 Sin `@Roles(...)` en una ruta, `RolesGuard` no restringe nada — no hay superusuario implícito: si
 ADMIN debe entrar a una ruta, se lista explícitamente igual que los demás.
 
+**Visibilidad propia en Calidad.** Monitoreo y Llamados solo ven las gestiones que ELLOS mismos
+registraron (`gestionadoPor`) — p. ej. Miguel no ve las gestiones de Sac aunque compartan el rol
+Monitoreo, porque la separación es por usuario, no por rol. Admin y Jefe ven todo el tenant. Aplica
+a `GET /v1/quality/surveys`, `GET /v1/quality/report` y `PATCH .../seguimiento`
+(`QualityController.alcance()`).
+
+**Login sin correo.** El identificador de login (columna `email` en `User`) admite un correo real o
+un usuario corto (p. ej. `jaison`) — el equipo que viene de monitor-operativo entra con el mismo
+usuario que ya conocía, sin correo. Se valida como texto libre, no como email.
+
 Próximo: biometría, expedientes y vehículos (Fase E).
 
 ## Despliegue

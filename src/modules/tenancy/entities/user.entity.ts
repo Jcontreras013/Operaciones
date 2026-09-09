@@ -24,6 +24,7 @@ export enum UserRole {
 @Entity('users')
 @Unique(['tenantId', 'email'])
 export class User extends TenantOwnedEntity {
+  /** Identificador de login, único por tenant: un correo real o un usuario corto (p. ej. "jaison"). */
   @Index()
   @Column()
   email!: string;

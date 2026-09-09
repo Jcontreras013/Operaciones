@@ -15,3 +15,8 @@ export const CurrentTenant = createParamDecorator(
 export const CurrentUserId = createParamDecorator(
   (_data: unknown, _ctx: ExecutionContext): string | undefined => TenantContext.getUserId(),
 );
+
+/** Inyecta el rol del usuario del operador autenticado (o undefined). */
+export const CurrentUserRole = createParamDecorator(
+  (_data: unknown, _ctx: ExecutionContext): string | undefined => TenantContext.getRole(),
+);
