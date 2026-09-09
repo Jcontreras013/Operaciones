@@ -82,4 +82,11 @@ export class FieldController {
   listRuns(@CurrentTenant() tenantId: string) {
     return this.ingest.listRuns(tenantId);
   }
+
+  /** Centro de Reportes: KPIs, tablero de carga y consolidado por segmento. */
+  @Get('reportes')
+  @Roles(UserRole.ADMIN, UserRole.JEFE)
+  getReportes(@CurrentTenant() tenantId: string) {
+    return this.ingest.getReportesBoard(tenantId);
+  }
 }

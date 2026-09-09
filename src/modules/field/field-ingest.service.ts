@@ -6,6 +6,18 @@ import { IngestRun } from './entities/ingest-run.entity';
 import { CEPHEUS_CONNECTOR, CepheusConnector, RawOrder } from './cepheus/cepheus-connector';
 import { CepheusRateLimitError } from './cepheus/http-cepheus.connector';
 import { clasificarCausaOffline, computeOfflineFlags, esUniversoDiagnostico } from './offline';
+import {
+  ACTIVIDADES_PERMITIDAS,
+  categoriaRetraso,
+  CategoriaRetraso,
+  clasificarTablero,
+  diasRetraso,
+  esAntesDeHoyHonduras,
+  esMismoDiaHonduras,
+  esPendienteMonitor,
+  esPlex,
+  tieneTecnicoValido,
+} from './reportes';
 
 /** Lee una clave (mayúsculas) de la orden cruda como string no vacío, o null. */
 function str(raw: RawOrder, key: string): string | null {
@@ -90,6 +102,49 @@ export interface GanttRow {
   /** ISO. HORA_LIQ, o el momento actual/fin del día si sigue abierta. */
   fin: string;
 }
+
+export interface ConteoEtiqueta {
+  etiqueta: string;
+  cantidad: number;
+}
+
+/** Avance de un segmento: universo "mora" (atrasado) vs. "hoy" (al día), y cuánto se cerró. */
+export interface SegmentoStats {
+  totalGlobal: number;
+  cerradasGlobal: number;
+  pctGlobal: number;
+  totalMora: number;
+  cerradasMora: number;
+  pctMora: number;
+  totalHoy: number;
+  cerradasHoy: number;
+  pctHoy: number;
+}
+
+export interface ReportesBoard {
+  kpis: {
+    pendientesAsignadas: number;
+    cerradasHoy: number;
+    tecnicosEnRuta: number;
+    caidasOffline: number;
+    totalGeneral: number;
+  };
+  tablero: {
+    resumenRetraso: { categoria: CategoriaRetraso; cantidad: number }[];
+    sop: ConteoEtiqueta[];
+    excedenDosHoras: number;
+    instalaciones: ConteoEtiqueta[];
+    plex: ConteoEtiqueta[];
+  };
+  segmentos: {
+    residencial: SegmentoStats;
+    plex: SegmentoStats;
+    global: SegmentoStats;
+  };
+}
+
+const CATEGORIAS_RETRASO: CategoriaRetraso[] = ['>= 7 Dia', '= 4 a 6 Dias', '= 1 a 3 Dias', '= 0 Dia'];
+const SUBTIPOS_INSTALACION = ['Nueva', 'Adición', 'Cambio / Migración', 'Recuperado'];
 
 @Injectable()
 export class FieldIngestService {
@@ -434,5 +489,135 @@ export class FieldIngestService {
     if (limit) qb.limit(limit);
     const rows = await qb.getRawMany<{ key: string; count: string }>();
     return rows.map((r) => ({ key: r.key, count: Number(r.count) }));
+  }
+
+  /**
+   * Centro de Reportes: KPIs del día, tablero de carga (retraso + SOP/
+   * Instalaciones/Plex) y consolidado por segmento. Portado de app.py — cada
+   * corte usa el mismo universo "pendientes" que el Monitor, para que los
+   * números no se desincronicen entre pantallas.
+   */
+  async getReportesBoard(tenantId: string): Promise<ReportesBoard> {
+    const ahora = new Date();
+    // Igual que el original: carga todo el dataset del tenant y clasifica en
+    // memoria (la lógica de SOP/INS/PLEX no es expresable en SQL sin
+    // duplicarla). Revisar si hace falta acotar por fecha cuando el volumen
+    // real de órdenes lo justifique.
+    const todas = await this.orders.find({ where: { tenantId } });
+
+    const pendientes = todas
+      .filter((o) => esPendienteMonitor(o))
+      .map((o) => ({ ...o, dias: diasRetraso(o.fechaApe, o.tecnico, ahora) }));
+    const pendientesAsignadas = pendientes.filter((o) => tieneTecnicoValido(o.tecnico));
+
+    const cerradasHoy = todas.filter(
+      (o) =>
+        (o.estado ?? '').trim().toUpperCase() === 'CERRADA' &&
+        ACTIVIDADES_PERMITIDAS.includes((o.actividad ?? '').trim().toUpperCase()) &&
+        tieneTecnicoValido(o.tecnico) &&
+        o.horaLiqAt != null &&
+        esMismoDiaHonduras(o.horaLiqAt, ahora),
+    );
+
+    const kpis = {
+      pendientesAsignadas: pendientesAsignadas.length,
+      cerradasHoy: cerradasHoy.length,
+      tecnicosEnRuta: new Set(pendientesAsignadas.map((o) => (o.tecnico as string).trim().toUpperCase())).size,
+      caidasOffline: pendientes.filter((o) => o.esOffline).length,
+      totalGeneral: pendientes.length,
+    };
+
+    const tablero = this.tableroDeCarga(pendientes);
+
+    const segmentoDe = (o: { segmento: string | null }) => (o.segmento ?? '').trim().toUpperCase();
+    const segmentos = {
+      residencial: this.calcularSegmento(
+        pendientesAsignadas.filter((o) => segmentoDe(o) === 'RESIDENCIAL'),
+        cerradasHoy.filter((o) => segmentoDe(o) === 'RESIDENCIAL'),
+        ahora,
+      ),
+      plex: this.calcularSegmento(
+        pendientesAsignadas.filter((o) => segmentoDe(o) === 'PLEX'),
+        cerradasHoy.filter((o) => segmentoDe(o) === 'PLEX'),
+        ahora,
+      ),
+      global: this.calcularSegmento(pendientesAsignadas, cerradasHoy, ahora),
+    };
+
+    return { kpis, tablero, segmentos };
+  }
+
+  private tableroDeCarga(
+    pendientes: (WorkOrder & { dias: number })[],
+  ): ReportesBoard['tablero'] {
+    const porRetraso = new Map<CategoriaRetraso, number>();
+    for (const cat of CATEGORIAS_RETRASO) porRetraso.set(cat, 0);
+    for (const o of pendientes) {
+      const cat = categoriaRetraso(o.dias);
+      porRetraso.set(cat, (porRetraso.get(cat) ?? 0) + 1);
+    }
+
+    const sop = new Map<string, number>();
+    const instalaciones = new Map<string, number>();
+    for (const cat of SUBTIPOS_INSTALACION) instalaciones.set(cat, 0);
+    let excedenDosHoras = 0;
+
+    for (const o of pendientes) {
+      const { grupo, subtipo } = clasificarTablero(o.actividad, o.comentario, o.esOffline);
+      if (grupo === 'SOP') {
+        sop.set(subtipo, (sop.get(subtipo) ?? 0) + 1);
+        if (o.alertaTiempo) excedenDosHoras += 1;
+      } else if (grupo === 'INS') {
+        instalaciones.set(subtipo, (instalaciones.get(subtipo) ?? 0) + 1);
+      }
+    }
+
+    const plex = new Map<string, number>();
+    for (const o of pendientes) {
+      if (esPlex(o.actividad) && tieneTecnicoValido(o.tecnico)) {
+        const actividad = (o.actividad ?? '').trim().toUpperCase();
+        plex.set(actividad, (plex.get(actividad) ?? 0) + 1);
+      }
+    }
+
+    const aLista = (m: Map<string, number>): ConteoEtiqueta[] =>
+      [...m.entries()].map(([etiqueta, cantidad]) => ({ etiqueta, cantidad })).sort((a, b) => b.cantidad - a.cantidad);
+
+    return {
+      resumenRetraso: CATEGORIAS_RETRASO.map((categoria) => ({ categoria, cantidad: porRetraso.get(categoria) ?? 0 })),
+      sop: aLista(sop),
+      excedenDosHoras,
+      instalaciones: SUBTIPOS_INSTALACION.map((etiqueta) => ({ etiqueta, cantidad: instalaciones.get(etiqueta) ?? 0 })),
+      plex: aLista(plex),
+    };
+  }
+
+  /** Universo "mora" (atrasado) vs. "hoy" (al día) para un segmento, y cuánto se cerró hoy. */
+  private calcularSegmento(
+    pendientesAsignadas: (WorkOrder & { dias: number })[],
+    cerradasHoy: WorkOrder[],
+    ahora: Date,
+  ): SegmentoStats {
+    const pMora = pendientesAsignadas.filter((o) => o.dias > 0).length;
+    const pHoy = pendientesAsignadas.filter((o) => o.dias === 0).length;
+    const cMora = cerradasHoy.filter((o) => o.fechaApe && esAntesDeHoyHonduras(o.fechaApe, ahora)).length;
+    const cHoy = cerradasHoy.filter((o) => o.fechaApe && esMismoDiaHonduras(o.fechaApe, ahora)).length;
+
+    const totalMora = pMora + cMora;
+    const totalHoy = pHoy + cHoy;
+    const totalGlobal = totalMora + totalHoy;
+    const cerradasGlobal = cMora + cHoy;
+
+    return {
+      totalGlobal,
+      cerradasGlobal,
+      pctGlobal: totalGlobal > 0 ? (cerradasGlobal / totalGlobal) * 100 : 0,
+      totalMora,
+      cerradasMora: cMora,
+      pctMora: totalMora > 0 ? (cMora / totalMora) * 100 : 0,
+      totalHoy,
+      cerradasHoy: cHoy,
+      pctHoy: totalHoy > 0 ? (cHoy / totalHoy) * 100 : 0,
+    };
   }
 }
