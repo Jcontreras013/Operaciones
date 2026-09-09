@@ -456,16 +456,25 @@ Authorization: Bearer {{token}}
 
 { "from": "2026-09-01T00:00:00Z" }
 
-### F2. Listar órdenes de campo (filtros: estado, tecnico, olt, search)
+### F2. Listar órdenes de campo (filtros: estado, tecnico, olt, search, from, to)
 GET {{baseUrl}}/v1/field/work-orders?estado=NOINSTALADO
+Authorization: Bearer {{token}}
+
+### F2b. Filtrar por rango de fechas (fechaApe) — "to" incluye el día completo
+GET {{baseUrl}}/v1/field/work-orders?from=2026-09-01&to=2026-09-07
 Authorization: Bearer {{token}}
 
 ### F3. Detalle de una orden (incluye la orden cruda en `raw`)
 GET {{baseUrl}}/v1/field/work-orders/REEMPLAZAR_WORK_ORDER_ID
 Authorization: Bearer {{token}}
 
-### F4. Historial de corridas de ingesta
+### F4. Historial de corridas de ingesta (incluye las de la ingesta programada)
 GET {{baseUrl}}/v1/field/ingest-runs
+Authorization: Bearer {{token}}
+
+### F4b. Línea de tiempo por técnico (Gantt) de un día calendario en Honduras.
+### Sin "date", usa hoy (hora de Honduras).
+GET {{baseUrl}}/v1/field/gantt?date=2026-09-08
 Authorization: Bearer {{token}}
 
 ### F5. Tablero del Monitor (totales + agregados por estado/actividad/técnico) — Fase B

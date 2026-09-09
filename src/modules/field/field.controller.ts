@@ -57,8 +57,18 @@ export class FieldController {
     @Query('tecnico') tecnico?: string,
     @Query('olt') olt?: string,
     @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.ingest.listWorkOrders(tenantId, { estado, tecnico, olt, search });
+    return this.ingest.listWorkOrders(tenantId, { estado, tecnico, olt, search, from, to });
+  }
+
+  /** Línea de tiempo por técnico (Gantt) de un día calendario en Honduras. */
+  @Get('gantt')
+  @Roles(UserRole.ADMIN, UserRole.JEFE, UserRole.MONITOREO)
+  getGantt(@CurrentTenant() tenantId: string, @Query('date') date?: string) {
+    const dateStr = date ?? new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' });
+    return this.ingest.getGantt(tenantId, dateStr);
   }
 
   @Get('work-orders/:id')

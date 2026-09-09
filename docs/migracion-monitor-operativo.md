@@ -105,6 +105,11 @@ El **frontend** agrega estas vistas a la consola React ya existente (mismo shell
   resultados de contacto + 7 preguntas cuando contestan, P4 con "No aplica"), CSAT oficial sobre
   P7, diagnóstico por pregunta (P1-P6), y seguimientos (ticket/responsable/fecha límite) con
   listado de pendientes. Sin envío por WhatsApp/WATI (servicio de paga sin usar). Ruta `/calidad`.
+- ✅ **Ingesta programada + Gantt + histórico navegable.** `FieldIngestScheduler` (reemplaza
+  `sync_job.py`, corre sola cada hora); Gantt por técnico (`GET /v1/field/gantt`, dentro de
+  `/monitor`, reemplaza el Gantt de `app.py`); filtro de fecha en la tabla de órdenes para navegar
+  cualquier día del histórico. De paso se corrigió un desfase de 6h en el parseo de fechas de
+  Cepheus (asumía la zona horaria del proceso en vez de Honduras UTC-6 explícito).
 - **Fase E — Biometría, expedientes/OCR, vehículos.**
 - **Fase F — Corte final** y apagado del Streamlit.
 

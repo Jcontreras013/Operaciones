@@ -1,6 +1,6 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, FindOptionsWhere, ILike, Repository } from 'typeorm';
+import { Between, DataSource, FindOptionsWhere, ILike, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { WorkOrder } from './entities/work-order.entity';
 import { IngestRun } from './entities/ingest-run.entity';
 import { CEPHEUS_CONNECTOR, CepheusConnector, RawOrder } from './cepheus/cepheus-connector';
@@ -15,13 +15,27 @@ function str(raw: RawOrder, key: string): string | null {
   return s === '' ? null : s;
 }
 
-/** Parsea 'dd/mm/aaaa [HH:MM]' o ISO a Date; null si no se puede. */
+/** Honduras es UTC-6 todo el año (sin horario de verano). */
+const HN_OFFSET_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Parsea 'dd/mm/aaaa [HH:MM]' o ISO a Date; null si no se puede.
+ *
+ * Cepheus reporta en hora de Honduras — 'dd/mm/aaaa HH:MM' es un reloj de
+ * pared de Honduras, no la zona horaria del proceso. Se arma el instante UTC
+ * explícitamente con el offset fijo (`Date.UTC(...) + HN_OFFSET_MS`) para no
+ * depender de en qué zona horaria corre el servidor (en producción es UTC,
+ * y `new Date(y,m,d,h,mi)` lo interpretaría como hora del servidor, no de
+ * Honduras — desfasaba todo por 6h: ALERTA_TIEMPO, el Gantt, y a qué día
+ * calendario pertenece cada orden).
+ */
 export function parseFecha(value: string | null): Date | null {
   if (!value) return null;
   const m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2}))?/);
   if (m) {
     const [, dd, mm, yyyy, hh = '00', mi = '00'] = m;
-    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(mi));
+    const ms = Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(mi)) + HN_OFFSET_MS;
+    const d = new Date(ms);
     return isNaN(d.getTime()) ? null : d;
   }
   const iso = new Date(value);
@@ -30,8 +44,9 @@ export function parseFecha(value: string | null): Date | null {
 
 /**
  * Combina una hora suelta ('HH:MM[:SS]', tal como la manda Cepheus para
- * HORA_INI/HORA_LIQ) con la fecha de apertura de la orden, para obtener una
- * marca de tiempo completa. Si `horaRaw` ya trae fecha propia, se usa esa.
+ * HORA_INI/HORA_LIQ) con la fecha calendario **de Honduras** de `fechaBase`
+ * (ya un instante UTC correcto), para obtener una marca de tiempo completa.
+ * Si `horaRaw` ya trae fecha propia, se usa esa (vía `parseFecha`).
  */
 function combineFechaHora(fechaBase: Date | null, horaRaw: string | null): Date | null {
   if (!horaRaw) return null;
@@ -40,9 +55,19 @@ function combineFechaHora(fechaBase: Date | null, horaRaw: string | null): Date 
   const m = horaRaw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if (m && fechaBase) {
     const [, hh, mi, ss = '0'] = m;
-    const d = new Date(fechaBase);
-    d.setHours(Number(hh), Number(mi), Number(ss), 0);
-    return d;
+    // Reloj de pared de Honduras de fechaBase: se resta el offset para leer
+    // año/mes/día "como si" el instante ya estuviera en hora de Honduras.
+    const hnWallClock = new Date(fechaBase.getTime() - HN_OFFSET_MS);
+    const ms =
+      Date.UTC(
+        hnWallClock.getUTCFullYear(),
+        hnWallClock.getUTCMonth(),
+        hnWallClock.getUTCDate(),
+        Number(hh),
+        Number(mi),
+        Number(ss),
+      ) + HN_OFFSET_MS;
+    return new Date(ms);
   }
   return null;
 }
@@ -52,6 +77,18 @@ export interface IngestResult {
   created: number;
   updated: number;
   runId: string;
+}
+
+export interface GanttRow {
+  tecnico: string;
+  externalNum: string;
+  cliente: string | null;
+  actividad: string | null;
+  estado: string | null;
+  /** ISO. Cuándo empezó a trabajarse la orden (HORA_INI). */
+  inicio: string;
+  /** ISO. HORA_LIQ, o el momento actual/fin del día si sigue abierta. */
+  fin: string;
 }
 
 @Injectable()
@@ -192,14 +229,78 @@ export class FieldIngestService {
 
   listWorkOrders(
     tenantId: string,
-    filters: { estado?: string; tecnico?: string; olt?: string; search?: string } = {},
+    filters: {
+      estado?: string;
+      tecnico?: string;
+      olt?: string;
+      search?: string;
+      from?: string;
+      to?: string;
+    } = {},
   ): Promise<WorkOrder[]> {
     const where: FindOptionsWhere<WorkOrder> = { tenantId };
     if (filters.estado) where.estado = filters.estado;
     if (filters.tecnico) where.tecnico = ILike(`%${filters.tecnico}%`);
     if (filters.olt) where.olt = filters.olt;
     if (filters.search) where.externalNum = ILike(`%${filters.search}%`);
-    return this.orders.find({ where, order: { fechaApe: 'DESC' }, take: 200 });
+
+    // "to" es inclusivo del día completo si viene sin hora (YYYY-MM-DD), para
+    // poder pedir "un día" sin tener que calcular medianoche del día siguiente.
+    const desde = filters.from ? new Date(filters.from) : null;
+    const hasta = filters.to ? new Date(filters.to) : null;
+    if (hasta && !filters.to?.includes('T')) hasta.setHours(23, 59, 59, 999);
+    if (desde && hasta) where.fechaApe = Between(desde, hasta);
+    else if (desde) where.fechaApe = MoreThanOrEqual(desde);
+    else if (hasta) where.fechaApe = LessThanOrEqual(hasta);
+
+    // Con filtro de fecha el resultado ya viene acotado por naturaleza (un
+    // día o un rango corto); sin filtro, se limita a lo más reciente.
+    const take = desde || hasta ? 500 : 200;
+    return this.orders.find({ where, order: { fechaApe: 'DESC' }, take });
+  }
+
+  /**
+   * Línea de tiempo por técnico (Gantt) de un día calendario en Honduras
+   * (UTC-6 todo el año, sin horario de verano). Reemplaza al "Gantt en
+   * vivo"/"Gantt Histórico" de app.py: una franja por orden trabajada ese
+   * día, desde HORA_INI hasta HORA_LIQ (o hasta ahora/fin del día si sigue
+   * abierta), con un ancho mínimo para que las visitas cortas se vean.
+   */
+  async getGantt(tenantId: string, dateStr: string): Promise<GanttRow[]> {
+    const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) {
+      throw new BadRequestException('Fecha inválida, use YYYY-MM-DD');
+    }
+    const [, y, mo, d] = m;
+    const inicioDia = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d)) + HN_OFFSET_MS);
+    const finDia = new Date(inicioDia.getTime() + 24 * 60 * 60 * 1000);
+
+    const orders = await this.orders.find({
+      where: { tenantId, horaIniAt: Between(inicioDia, finDia) },
+      order: { tecnico: 'ASC', horaIniAt: 'ASC' },
+    });
+
+    const ahora = new Date();
+    const limiteFin = ahora >= inicioDia && ahora < finDia ? ahora : finDia;
+    const minMs = 15 * 60 * 1000;
+
+    return orders
+      .filter((o) => o.tecnico && o.horaIniAt)
+      .map((o) => {
+        const inicio = o.horaIniAt as Date;
+        let fin = o.horaLiqAt ?? limiteFin;
+        if (fin.getTime() - inicio.getTime() < minMs) fin = new Date(inicio.getTime() + minMs);
+        if (fin > finDia) fin = finDia;
+        return {
+          tecnico: o.tecnico as string,
+          externalNum: o.externalNum,
+          cliente: o.cliente,
+          actividad: o.actividad,
+          estado: o.estado,
+          inicio: inicio.toISOString(),
+          fin: fin.toISOString(),
+        };
+      });
   }
 
   async getWorkOrder(tenantId: string, id: string): Promise<WorkOrder> {

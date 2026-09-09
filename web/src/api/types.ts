@@ -194,3 +194,15 @@ export interface QualityReport {
   diagnostico: QualityDiagnosticoItem[];
   seguimientosPendientes: QualitySurvey[];
 }
+
+// --- Gantt por técnico ---
+
+export interface GanttRow {
+  tecnico: string;
+  externalNum: string;
+  cliente: string | null;
+  actividad: string | null;
+  estado: string | null;
+  inicio: string;
+  fin: string;
+}

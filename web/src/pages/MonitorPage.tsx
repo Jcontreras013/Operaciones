@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
-import type { FieldBoard, IngestResult, WorkOrder } from '@/api/types';
+import type { FieldBoard, GanttRow, IngestResult, WorkOrder } from '@/api/types';
 import { ErrorBox, Loading, PageHeader } from '@/components/ui';
+import { GanttChart } from '@/components/GanttChart';
 
 function estadoClass(estado: string | null): string {
   const e = (estado ?? '').toUpperCase();
@@ -13,15 +14,35 @@ function estadoClass(estado: string | null): string {
   return '';
 }
 
+/** 'YYYY-MM-DD' de hoy en hora de Honduras (para que el Gantt abra en el día correcto). */
+function hoyHN(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' });
+}
+
 export function MonitorPage() {
   const qc = useQueryClient();
   const [estado, setEstado] = useState<string | null>(null);
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [fechaGantt, setFechaGantt] = useState(hoyHN());
 
   const board = useQuery({ queryKey: ['field-board'], queryFn: () => api<FieldBoard>('/v1/field/board') });
+
   const orders = useQuery({
-    queryKey: ['field-orders', estado],
-    queryFn: () =>
-      api<WorkOrder[]>(`/v1/field/work-orders${estado ? `?estado=${encodeURIComponent(estado)}` : ''}`),
+    queryKey: ['field-orders', estado, fechaDesde, fechaHasta],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (estado) params.set('estado', estado);
+      if (fechaDesde) params.set('from', fechaDesde);
+      if (fechaHasta) params.set('to', fechaHasta);
+      const qs = params.toString();
+      return api<WorkOrder[]>(`/v1/field/work-orders${qs ? `?${qs}` : ''}`);
+    },
+  });
+
+  const gantt = useQuery({
+    queryKey: ['field-gantt', fechaGantt],
+    queryFn: () => api<GanttRow[]>(`/v1/field/gantt?date=${fechaGantt}`),
   });
 
   const sync = useMutation({
@@ -29,8 +50,11 @@ export function MonitorPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['field-board'] });
       qc.invalidateQueries({ queryKey: ['field-orders'] });
+      qc.invalidateQueries({ queryKey: ['field-gantt'] });
     },
   });
+
+  const hayFiltroFecha = Boolean(fechaDesde || fechaHasta);
 
   return (
     <div>
@@ -108,14 +132,47 @@ export function MonitorPage() {
         </>
       )}
 
+      <section className="card" style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: 10 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700 }}>Línea de tiempo por técnico (Gantt)</h2>
+          <input
+            className="input"
+            type="date"
+            style={{ width: 'auto' }}
+            value={fechaGantt}
+            max={hoyHN()}
+            onChange={(e) => setFechaGantt(e.target.value)}
+          />
+        </div>
+        <div style={{ padding: 20 }}>
+          {gantt.isLoading && <Loading />}
+          {gantt.error && <ErrorBox message={(gantt.error as Error).message} />}
+          {gantt.data && <GanttChart date={fechaGantt} rows={gantt.data} />}
+        </div>
+      </section>
+
       <section className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: 10 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700 }}>
             Órdenes {estado && <span className={`badge ${estadoClass(estado)}`} style={{ marginLeft: 8 }}>{estado.toLowerCase()}</span>}
           </h2>
-          {estado && (
-            <button className="btn btn-sm" onClick={() => setEstado(null)}>Quitar filtro</button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input className="input" type="date" style={{ width: 'auto' }} value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
+            <span className="muted" style={{ fontSize: 13 }}>a</span>
+            <input className="input" type="date" style={{ width: 'auto' }} value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+            {(estado || hayFiltroFecha) && (
+              <button
+                className="btn btn-sm"
+                onClick={() => {
+                  setEstado(null);
+                  setFechaDesde('');
+                  setFechaHasta('');
+                }}
+              >
+                Quitar filtros
+              </button>
+            )}
+          </div>
         </div>
         {orders.isLoading && <Loading />}
         {orders.data && orders.data.length === 0 && (
