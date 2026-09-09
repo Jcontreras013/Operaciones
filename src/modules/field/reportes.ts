@@ -50,6 +50,25 @@ export function esPendienteMonitor(order: { estado: string | null; tecnico: stri
   return ACTIVIDADES_PERMITIDAS.includes(norm(order.actividad));
 }
 
+/** ¿Esta orden no tiene técnico asignado, siendo de una actividad que sí debería tenerlo? */
+export function esNoAsignadaValida(actividad: string | null, tecnico: string | null): boolean {
+  return !tieneTecnicoValido(tecnico) && ACTIVIDADES_PERMITIDAS.includes(norm(actividad));
+}
+
+/**
+ * "Ver solo Críticas" del Monitor: soportes de fibra (SOP) offline o con
+ * alerta de tiempo, excluyendo instalaciones/Plex — un PEXTERNO o INSFIBRA
+ * cuya actividad mencione "SOP" de pasada no debe colarse aquí.
+ */
+const RE_FALSOS_CRITICA = /PLEXISCA|PEXTERNO|SPLITTEROPT|PLEX|INS|NUEVA|ADIC|CAMBIO|RECU|TVADICIONAL|MIGRACI/;
+
+export function esCritica(actividad: string | null, esOffline: boolean, alertaTiempo: boolean): boolean {
+  if (!esOffline && !alertaTiempo) return false;
+  const act = norm(actividad);
+  if (!/SOP/.test(act)) return false;
+  return !RE_FALSOS_CRITICA.test(act);
+}
+
 /** Días de retraso desde FECHA_APE (0 para el técnico excluido, nunca negativo). */
 export function diasRetraso(fechaApe: Date | null, tecnico: string | null, ahora: Date = new Date()): number {
   if (norm(tecnico) === TECNICO_EXCLUIDO_RETRASO) return 0;

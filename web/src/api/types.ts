@@ -108,6 +108,7 @@ export interface FieldBoard {
   total: number;
   byEstado: FieldGroup[];
   byActividad: FieldGroup[];
+  byMotivo: FieldGroup[];
   byTecnico: FieldGroup[];
   lastIngest: { ranAt: string; fetched: number; status: string } | null;
 }

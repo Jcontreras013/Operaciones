@@ -54,13 +54,29 @@ export class FieldController {
   listWorkOrders(
     @CurrentTenant() tenantId: string,
     @Query('estado') estado?: string,
+    @Query('actividad') actividad?: string,
+    @Query('motivo') motivo?: string,
     @Query('tecnico') tecnico?: string,
     @Query('olt') olt?: string,
     @Query('search') search?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('criticas') criticas?: string,
+    @Query('noAsignadas') noAsignadas?: string,
   ) {
-    return this.ingest.listWorkOrders(tenantId, { estado, tecnico, olt, search, from, to });
+    const lista = (v?: string) => (v ? v.split(',').filter(Boolean) : undefined);
+    return this.ingest.listWorkOrders(tenantId, {
+      estado: lista(estado),
+      actividad: lista(actividad),
+      motivo: lista(motivo),
+      tecnico,
+      olt,
+      search,
+      from,
+      to,
+      criticas: criticas === 'true',
+      noAsignadas: noAsignadas === 'true',
+    });
   }
 
   /** Línea de tiempo por técnico (Gantt) de un día calendario en Honduras. */

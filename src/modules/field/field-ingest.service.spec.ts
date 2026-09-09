@@ -193,6 +193,36 @@ describe('FieldIngestService.listWorkOrders (filtro de fecha)', () => {
     expect(opts.take).toBe(500);
     expect(opts.where.fechaApe).toBeDefined();
   });
+
+  it('estado/actividad/motivo se pasan como In(...) para multiselección', async () => {
+    const orderRepo = { find: jest.fn().mockResolvedValue([]) };
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never);
+    await service.listWorkOrders('t1', { estado: ['ASIGNADA', 'CERRADA'], actividad: ['SOPFIBRA'], motivo: ['NIVELES'] });
+    const [opts] = orderRepo.find.mock.calls[0];
+    expect(opts.where.estado._value).toEqual(['ASIGNADA', 'CERRADA']);
+    expect(opts.where.actividad._value).toEqual(['SOPFIBRA']);
+    expect(opts.where.motivo._value).toEqual(['NIVELES']);
+  });
+
+  it('"criticas"/"noAsignadas" filtran en memoria sin límite de página', async () => {
+    const orderRepo = {
+      find: jest.fn().mockResolvedValue([
+        { actividad: 'SOPFIBRA', tecnico: 'Norman', esOffline: true, alertaTiempo: false },
+        { actividad: 'INSFIBRA', tecnico: 'Norman', esOffline: true, alertaTiempo: false },
+        { actividad: 'SOPFIBRA', tecnico: '', esOffline: false, alertaTiempo: false },
+      ]),
+    };
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never);
+
+    const criticas = await service.listWorkOrders('t1', { criticas: true });
+    expect(criticas).toHaveLength(1);
+    expect(criticas[0].actividad).toBe('SOPFIBRA');
+    expect(orderRepo.find.mock.calls[0][0].take).toBeUndefined();
+
+    const noAsignadas = await service.listWorkOrders('t1', { noAsignadas: true });
+    expect(noAsignadas).toHaveLength(1);
+    expect(noAsignadas[0].tecnico).toBe('');
+  });
 });
 
 describe('FieldIngestService.getReportesBoard', () => {

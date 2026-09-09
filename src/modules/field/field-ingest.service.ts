@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, DataSource, FindOptionsWhere, ILike, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
+import { Between, DataSource, FindOptionsWhere, ILike, In, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { WorkOrder } from './entities/work-order.entity';
 import { IngestRun } from './entities/ingest-run.entity';
 import { CEPHEUS_CONNECTOR, CepheusConnector, RawOrder } from './cepheus/cepheus-connector';
@@ -13,7 +13,9 @@ import {
   clasificarTablero,
   diasRetraso,
   esAntesDeHoyHonduras,
+  esCritica,
   esMismoDiaHonduras,
+  esNoAsignadaValida,
   esPendienteMonitor,
   esPlex,
   tieneTecnicoValido,
@@ -282,19 +284,25 @@ export class FieldIngestService {
     return { fetched, created, updated, runId: run.id };
   }
 
-  listWorkOrders(
+  async listWorkOrders(
     tenantId: string,
     filters: {
-      estado?: string;
+      estado?: string[];
+      actividad?: string[];
+      motivo?: string[];
       tecnico?: string;
       olt?: string;
       search?: string;
       from?: string;
       to?: string;
+      criticas?: boolean;
+      noAsignadas?: boolean;
     } = {},
   ): Promise<WorkOrder[]> {
     const where: FindOptionsWhere<WorkOrder> = { tenantId };
-    if (filters.estado) where.estado = filters.estado;
+    if (filters.estado?.length) where.estado = In(filters.estado);
+    if (filters.actividad?.length) where.actividad = In(filters.actividad);
+    if (filters.motivo?.length) where.motivo = In(filters.motivo);
     if (filters.tecnico) where.tecnico = ILike(`%${filters.tecnico}%`);
     if (filters.olt) where.olt = filters.olt;
     if (filters.search) where.externalNum = ILike(`%${filters.search}%`);
@@ -307,6 +315,19 @@ export class FieldIngestService {
     if (desde && hasta) where.fechaApe = Between(desde, hasta);
     else if (desde) where.fechaApe = MoreThanOrEqual(desde);
     else if (hasta) where.fechaApe = LessThanOrEqual(hasta);
+
+    // "Ver solo Críticas"/"Ver NO Asignadas" son máscaras calculadas (no
+    // expresables como columna SQL sin duplicar la clasificación), así que
+    // se aplican en memoria — para eso hace falta traer todo lo que cumple
+    // el resto de filtros, no solo la página visible.
+    if (filters.criticas || filters.noAsignadas) {
+      const todas = await this.orders.find({ where, order: { fechaApe: 'DESC' } });
+      return todas.filter((o) => {
+        if (filters.criticas && !esCritica(o.actividad, o.esOffline, o.alertaTiempo)) return false;
+        if (filters.noAsignadas && !esNoAsignadaValida(o.actividad, o.tecnico)) return false;
+        return true;
+      });
+    }
 
     // Con filtro de fecha el resultado ya viene acotado por naturaleza (un
     // día o un rango corto); sin filtro, se limita a lo más reciente.
@@ -370,18 +391,20 @@ export class FieldIngestService {
     return this.runs.find({ where: { tenantId }, order: { createdAt: 'DESC' }, take: 50 });
   }
 
-  /** Tablero del monitor: totales y agregados por estado, actividad y técnico. */
+  /** Tablero del monitor: totales y agregados por estado, actividad, motivo y técnico. */
   async getBoard(tenantId: string): Promise<{
     total: number;
     byEstado: { key: string; count: number }[];
     byActividad: { key: string; count: number }[];
+    byMotivo: { key: string; count: number }[];
     byTecnico: { key: string; count: number }[];
     lastIngest: { ranAt: string; fetched: number; status: string } | null;
   }> {
     const total = await this.orders.count({ where: { tenantId } });
-    const [byEstado, byActividad, byTecnico] = await Promise.all([
+    const [byEstado, byActividad, byMotivo, byTecnico] = await Promise.all([
       this.groupCount(tenantId, 'estado'),
       this.groupCount(tenantId, 'actividad'),
+      this.groupCount(tenantId, 'motivo'),
       this.groupCount(tenantId, 'tecnico', 10),
     ]);
     const run = await this.runs.findOne({
@@ -392,6 +415,7 @@ export class FieldIngestService {
       total,
       byEstado,
       byActividad,
+      byMotivo,
       byTecnico,
       lastIngest: run
         ? { ranAt: run.createdAt.toISOString(), fetched: run.fetched, status: run.status }
@@ -476,7 +500,7 @@ export class FieldIngestService {
   /** Conteo agrupado por una columna, ordenado desc; los null se muestran como '(sin dato)'. */
   private async groupCount(
     tenantId: string,
-    column: 'estado' | 'actividad' | 'tecnico',
+    column: 'estado' | 'actividad' | 'motivo' | 'tecnico',
     limit?: number,
   ): Promise<{ key: string; count: number }[]> {
     const qb = this.orders
