@@ -26,6 +26,13 @@ export class FieldController {
     return this.ingest.getBoard(tenantId);
   }
 
+  /** Diagnóstico de offline: totales, causa raíz y mapa de saturación OLT/PON. */
+  @Get('offline')
+  offlineBoard(@CurrentTenant() tenantId: string, @Query('days') days?: string) {
+    const dias = days ? Number(days) : 30;
+    return this.ingest.getOfflineBoard(tenantId, Number.isFinite(dias) && dias > 0 ? dias : 30);
+  }
+
   @Get('work-orders')
   listWorkOrders(
     @CurrentTenant() tenantId: string,

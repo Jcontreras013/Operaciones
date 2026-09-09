@@ -160,11 +160,21 @@ inventario (WMS) y rutas (última milla); portal de cliente y app del conductor 
 ## Migración del Monitor Operativo (unificación)
 
 Plan en [`docs/migracion-monitor-operativo.md`](./docs/migracion-monitor-operativo.md).
-**Fase A entregada** (módulo `field`): ingesta de órdenes telecom desde la API **Cepheus** a
-PostgreSQL, con un **conector enchufable** (stub en Fase A → adaptador HTTP real con
-credenciales por env var), upsert idempotente por `NUM`, registro de corridas (`ingest_runs`)
-y consulta/filtrado de órdenes. Reemplaza al `sync_job.py` del monitor. Próximo: la vista
-"Monitor diario" en React (Fase B).
+
+- **Fase A — Ingesta** (módulo `field`): órdenes telecom desde la API **Cepheus** a PostgreSQL,
+  con un **conector enchufable** (stub hoy → adaptador HTTP real con credenciales por env var),
+  upsert idempotente por `NUM`, registro de corridas (`ingest_runs`). Reemplaza al `sync_job.py`
+  del monitor.
+- **Fase B — Monitor diario** (React, ruta `/monitor`): tablero con totales por estado/actividad/
+  técnico, filtros y sincronización manual (`GET /v1/field/board`).
+- **Fase C — Offline y mapa OLT/PON** (React, ruta `/red`): detección de equipos de red caídos
+  (`ES_OFFLINE`) y demoras SOP sin liquidar (`ALERTA_TIEMPO`) sobre soportes de fibra abiertos;
+  diagnóstico de causa raíz clasificando el cierre del técnico (incluye falsos positivos) sobre
+  los ya cerrados; mapa de concentración de fallas por OLT y por PON. Portado 1:1 de la lógica de
+  `tools.py` (`calcular_offline_y_alertas`, `clasificar_causa_offline`) — ver `src/modules/field/
+  offline.ts` (`GET /v1/field/offline`, con `?days=` para la ventana del diagnóstico).
+
+Próximo: calidad y reportes (Fase D).
 
 ## Despliegue
 
