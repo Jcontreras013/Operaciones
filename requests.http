@@ -29,6 +29,17 @@ Content-Type: application/json
   "password": "superseguro"
 }
 
+### 1c. El campo "email" también admite un usuario corto, sin correo
+### (p. ej. el equipo que viene de monitor-operativo, que entra así).
+POST {{baseUrl}}/v1/auth/login
+Content-Type: application/json
+
+{
+  "tenantSlug": "maxcom",
+  "email": "jaison",
+  "password": "REEMPLAZAR"
+}
+
 ### 2. Ver el operador actual
 GET {{baseUrl}}/v1/tenant
 Authorization: Bearer {{token}}

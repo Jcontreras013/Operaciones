@@ -140,4 +140,13 @@ describe('QualityService.resolverSeguimiento', () => {
     const saved = await service.resolverSeguimiento(tenantId, 'q1', true);
     expect(saved.seguimientoResuelto).toBe(true);
   });
+
+  it('con soloPropio, busca también por gestionadoPor (Monitoreo/Llamados solo ven lo suyo)', async () => {
+    const { service, surveys } = build();
+    surveys.findOne.mockResolvedValue({ id: 'q1', seguimientoResuelto: false });
+    await service.resolverSeguimiento(tenantId, 'q1', true, 'user-miguel');
+    expect(surveys.findOne).toHaveBeenCalledWith({
+      where: { tenantId, id: 'q1', gestionadoPor: 'user-miguel' },
+    });
+  });
 });
