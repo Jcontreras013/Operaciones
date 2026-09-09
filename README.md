@@ -162,9 +162,13 @@ inventario (WMS) y rutas (última milla); portal de cliente y app del conductor 
 Plan en [`docs/migracion-monitor-operativo.md`](./docs/migracion-monitor-operativo.md).
 
 - **Fase A — Ingesta** (módulo `field`): órdenes telecom desde la API **Cepheus** a PostgreSQL,
-  con un **conector enchufable** (stub hoy → adaptador HTTP real con credenciales por env var),
-  upsert idempotente por `NUM`, registro de corridas (`ingest_runs`). Reemplaza al `sync_job.py`
-  del monitor.
+  con un **conector enchufable** — `HttpCepheusConnector` (HTTP Basic Auth, rota entre varias
+  cuentas de consulta, respeta el límite de 5 consultas/hora de Cepheus) si `CEPHEUS_BASE_URL`
+  está configurada, si no el stub con órdenes de ejemplo. Ver variables `CEPHEUS_*` en
+  [`.env.example`](./.env.example) — nunca en el repo, y nunca reutilizar credenciales que hayan
+  estado expuestas en `monitor-operativo` (repo público: rotarlas en Cepheus/IT primero). Upsert
+  idempotente por `NUM`, registro de corridas (`ingest_runs`, con estado `rate_limited` aparte de
+  `error`). Reemplaza al `sync_job.py` del monitor.
 - **Fase B — Monitor diario** (React, ruta `/monitor`): tablero con totales por estado/actividad/
   técnico, filtros y sincronización manual (`GET /v1/field/board`).
 - **Fase C — Offline y mapa OLT/PON** (React, ruta `/red`): detección de equipos de red caídos

@@ -4,6 +4,7 @@ import { DataSource, FindOptionsWhere, ILike, Repository } from 'typeorm';
 import { WorkOrder } from './entities/work-order.entity';
 import { IngestRun } from './entities/ingest-run.entity';
 import { CEPHEUS_CONNECTOR, CepheusConnector, RawOrder } from './cepheus/cepheus-connector';
+import { CepheusRateLimitError } from './cepheus/http-cepheus.connector';
 import { clasificarCausaOffline, computeOfflineFlags, esUniversoDiagnostico } from './offline';
 
 /** Lee una clave (mayúsculas) de la orden cruda como string no vacío, o null. */
@@ -161,9 +162,18 @@ export class FieldIngestService {
         }
       });
     } catch (err) {
-      status = 'error';
-      error = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Ingesta falló: ${error}`);
+      if (err instanceof CepheusRateLimitError) {
+        // No es una falla de esta corrida: se agotó el cupo compartido de
+        // consultas de Cepheus. Se registra aparte para no confundirlo con
+        // un error real y no generar ruido innecesario en los logs.
+        status = 'rate_limited';
+        error = err.message;
+        this.logger.warn(`Ingesta pospuesta por límite de Cepheus: ${error}`);
+      } else {
+        status = 'error';
+        error = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Ingesta falló: ${error}`);
+      }
     }
 
     const run = await this.runs.save({
