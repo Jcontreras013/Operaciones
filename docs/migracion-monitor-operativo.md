@@ -112,10 +112,14 @@ El **frontend** agrega estas vistas a la consola React ya existente (mismo shell
 1. **Dominio distinto.** Operaciones nació como 3PL/logística; el monitor es telecom FTTH.
    Los módulos nuevos son de dominio telecom — reusamos *patrones* (registro único, eventos,
    read model, conectores), no las entidades de logística.
-2. **Secretos y datos personales en el repo (importante).** `monitor-operativo` es **público** y
-   contiene **tokens de GPS (SkyTrack)** y **nombres de personal** en archivos `.txt`. Al migrar,
-   esos secretos deben ir a variables de entorno / configuración segura, y los datos personales a
-   la BD con control de acceso. Conviene además rotar los tokens expuestos.
+2. **Secretos y datos personales en el repo (importante — acción pendiente).** `monitor-operativo`
+   es **público** y contiene **tokens de GPS (SkyTrack)**, **nombres de personal** en archivos
+   `.txt`, y una **credencial de la API Cepheus hardcodeada** como valor por defecto en `tools.py`
+   (`consultar_api_ordenes`, usuario/contraseña de HTTP Basic Auth). Todo esto debe **rotarse en
+   Cepheus/IT y SkyTrack cuanto antes** — el conector nuevo (`HttpCepheusConnector`) no reutiliza
+   nada de eso, toma sus credenciales de variables de entorno, pero la credencial vieja sigue
+   siendo válida hasta que se rote del lado del proveedor. Los datos personales van a la BD con
+   control de acceso.
 3. **¿Migrar Google Sheets a Postgres o mantenerlo?** Recomendado migrar a Postgres (fuente única
    de verdad); si hay usuarios que editan en Sheets, evaluar una sincronización de transición.
 4. **Credenciales de la API Cepheus / Google.** Las necesita el módulo de ingesta como env vars
