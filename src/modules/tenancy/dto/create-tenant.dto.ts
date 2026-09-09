@@ -1,6 +1,12 @@
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
-/** Alta de operador (US1.1). Crea el tenant y su primer usuario admin. */
+/**
+ * Alta de operador (US1.1). Crea el tenant y su primer usuario admin.
+ *
+ * `adminEmail` es el identificador de login del admin (único por tenant) —
+ * admite un correo real o un usuario corto (p. ej. "jaison"), igual que
+ * `LoginDto`/`CreateUserDto`.
+ */
 export class CreateTenantDto {
   @IsString()
   @MinLength(2)
@@ -15,7 +21,9 @@ export class CreateTenantDto {
   @MaxLength(60)
   slug!: string;
 
-  @IsEmail()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
   adminEmail!: string;
 
   @IsString()
