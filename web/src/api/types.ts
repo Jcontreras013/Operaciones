@@ -81,6 +81,31 @@ export interface WorkOrder {
   esOffline: boolean;
   alertaTiempo: boolean;
   causaOffline: string | null;
+  source: string;
+}
+
+export interface CreateManualWorkOrderInput {
+  numOrden: string;
+  actividad: string;
+  tecnico: string;
+  fecha: string;
+  horaInicio: string;
+  horaLiq?: string;
+}
+
+export interface TechnicianLunch {
+  id: string;
+  tecnico: string;
+  fecha: string;
+  horaInicioAt: string;
+  horaFinAt: string;
+}
+
+export interface RegistrarAlmuerzoInput {
+  tecnico: string;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
 }
 
 export interface OltPonRow {

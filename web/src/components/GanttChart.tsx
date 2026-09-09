@@ -8,13 +8,33 @@ function inicioDiaHNms(dateStr: string): number {
   return Date.UTC(y, m - 1, d) + 6 * 60 * 60 * 1000;
 }
 
-function estadoColor(estado: string | null): string {
-  const e = (estado ?? '').toUpperCase();
-  if (e === 'CERRADA' || e === 'INSTALADA') return 'var(--good)';
-  if (e === 'NOINSTALADO' || e === 'CANCELADA') return 'var(--bad)';
-  if (e === 'ASIGNADA' || e === 'EN PROCESO') return 'var(--teal)';
-  if (e === 'REPROGRAMADA' || e === 'PENDIENTE') return 'var(--warn)';
-  return 'var(--faint)';
+/** Mismo esquema que colores_solidos del monitor original — un color fijo por tipo de actividad. */
+const COLOR_POR_ACTIVIDAD: Record<string, string> = {
+  SOPFIBRA: '#d32f2f',
+  SOPFIBRACORP: '#880e4f',
+  SOPCORP: '#ad1457',
+  SOP: '#d32f2f',
+  INSFIBRA: '#1976d2',
+  INSFIBRACORP: '#0d47a1',
+  INSEQUIPO: '#1565c0',
+  INSHFC: '#1565c0',
+  PEXTERNO: '#f57c00',
+  PLEXISCA: '#e65100',
+  SPLITTEROPT: '#ef6c00',
+  TRASLADOEXTFIBRA: '#8e24aa',
+  TRASLADOEXTFIBRACORP: '#8e24aa',
+  TRASLADOINTERNOFIBRA: '#7b1fa2',
+  TRASLADOINTFIBRACORP: '#7b1fa2',
+  SOPRECONCORP: '#c2185b',
+  SOPRECONHFC: '#c2185b',
+  SOPRECONFIBRA: '#c2185b',
+  TVADICIONAL: '#00897b',
+  ALMUERZO: '#78909c',
+};
+
+function actividadColor(actividad: string | null): string {
+  const a = (actividad ?? '').toUpperCase();
+  return COLOR_POR_ACTIVIDAD[a] ?? 'var(--faint)';
 }
 
 /** Línea de tiempo por técnico (reemplaza el Gantt de app.py). Eje: 24h del día pedido, hora de Honduras. */
@@ -75,14 +95,14 @@ export function GanttChart({ date, rows }: { date: string; rows: GanttRow[] }) {
                 return (
                   <div
                     key={`${o.externalNum}-${i}`}
-                    title={`${o.externalNum} · ${o.actividad ?? '—'} · ${o.cliente ?? '—'} · ${(o.estado ?? '—').toLowerCase()}\n${new Date(o.inicio).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Tegucigalpa' })}–${new Date(o.fin).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Tegucigalpa' })}`}
+                    title={`${o.actividad === 'ALMUERZO' ? 'Almuerzo' : o.externalNum} · ${o.actividad ?? '—'}${o.cliente ? ` · ${o.cliente}` : ''}${o.estado ? ` · ${o.estado.toLowerCase()}` : ''}\n${new Date(o.inicio).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Tegucigalpa' })}–${new Date(o.fin).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Tegucigalpa' })}`}
                     style={{
                       position: 'absolute',
                       left: `${(leftH / 24) * 100}%`,
                       width: `${(widthH / 24) * 100}%`,
                       top: 3,
                       bottom: 3,
-                      background: estadoColor(o.estado),
+                      background: actividadColor(o.actividad),
                       borderRadius: 4,
                       minWidth: 3,
                       cursor: 'default',
@@ -91,6 +111,15 @@ export function GanttChart({ date, rows }: { date: string; rows: GanttRow[] }) {
                 );
               })}
             </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 14px', marginTop: 12 }}>
+        {[...new Set(rows.map((r) => (r.actividad ?? '').toUpperCase()).filter(Boolean))].sort().map((a) => (
+          <div key={a} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: actividadColor(a), display: 'inline-block' }} />
+            <span className="muted">{a}</span>
           </div>
         ))}
       </div>

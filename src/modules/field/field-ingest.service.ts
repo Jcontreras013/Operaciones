@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Between, DataSource, FindOptionsWhere, ILike, In, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { WorkOrder } from './entities/work-order.entity';
 import { IngestRun } from './entities/ingest-run.entity';
+import { TechnicianLunch } from './entities/technician-lunch.entity';
 import { CEPHEUS_CONNECTOR, CepheusConnector, RawOrder } from './cepheus/cepheus-connector';
 import { CepheusRateLimitError } from './cepheus/http-cepheus.connector';
 import { clasificarCausaOffline, computeOfflineFlags, esUniversoDiagnostico } from './offline';
@@ -86,6 +87,13 @@ function combineFechaHora(fechaBase: Date | null, horaRaw: string | null): Date 
   return null;
 }
 
+/** Combina 'YYYY-MM-DD' + 'HH:MM' (hora de Honduras) en el instante UTC correspondiente. */
+function combinarFechaHoraHonduras(fecha: string, hora: string): Date {
+  const [y, mo, d] = fecha.split('-').map(Number);
+  const [hh, mi] = hora.split(':').map(Number);
+  return new Date(Date.UTC(y, mo - 1, d, hh, mi) + HN_OFFSET_MS);
+}
+
 export interface IngestResult {
   fetched: number;
   created: number;
@@ -157,6 +165,7 @@ export class FieldIngestService {
     @InjectRepository(IngestRun) private readonly runs: Repository<IngestRun>,
     @Inject(CEPHEUS_CONNECTOR) private readonly cepheus: CepheusConnector,
     private readonly dataSource: DataSource,
+    @InjectRepository(TechnicianLunch) private readonly lunches: Repository<TechnicianLunch>,
   ) {}
 
   /**
@@ -245,6 +254,12 @@ export class FieldIngestService {
             ingestedAt,
           };
           const existing = await repo.findOne({ where: { tenantId, externalNum } });
+          if (existing?.source === 'manual') {
+            // La orden manual es una corrección deliberada del supervisor:
+            // gana sobre la versión real del mismo NUM hasta que se borra
+            // explícitamente desde su propio panel (ver borrarOrdenManual).
+            continue;
+          }
           if (existing) {
             // save con id actualiza la fila (update() no admite bien el jsonb).
             await repo.save({ ...fields, id: existing.id });
@@ -360,7 +375,7 @@ export class FieldIngestService {
     const limiteFin = ahora >= inicioDia && ahora < finDia ? ahora : finDia;
     const minMs = 15 * 60 * 1000;
 
-    return orders
+    const filas = orders
       .filter((o) => o.tecnico && o.horaIniAt)
       .map((o) => {
         const inicio = o.horaIniAt as Date;
@@ -377,6 +392,23 @@ export class FieldIngestService {
           fin: fin.toISOString(),
         };
       });
+
+    // Los almuerzos se dibujan como un bloque más en el Gantt (actividad
+    // 'ALMUERZO', su propio color) — igual que el original.
+    const almuerzos = await this.getAlmuerzos(tenantId, dateStr);
+    for (const a of almuerzos) {
+      filas.push({
+        tecnico: a.tecnico,
+        externalNum: `ALMUERZO-${a.id}`,
+        cliente: null,
+        actividad: 'ALMUERZO',
+        estado: null,
+        inicio: a.horaInicioAt.toISOString(),
+        fin: a.horaFinAt.toISOString(),
+      });
+    }
+
+    return filas;
   }
 
   async getWorkOrder(tenantId: string, id: string): Promise<WorkOrder> {
@@ -643,5 +675,91 @@ export class FieldIngestService {
       cerradasHoy: cHoy,
       pctHoy: totalHoy > 0 ? (cHoy / totalHoy) * 100 : 0,
     };
+  }
+
+  /**
+   * "Ingresar Orden Manual": para cuando la API de Cepheus falla y una orden
+   * real no se refleja en el sistema. Se guarda (o reemplaza, si ya existía
+   * una orden manual con el mismo número) con `source: 'manual'`, que hace
+   * que la ingesta de Cepheus deje de tocarla — ver el `continue` en
+   * `ingest()`. Para volver a la versión real, se borra la orden manual.
+   */
+  async crearOrdenManual(
+    tenantId: string,
+    dto: { numOrden: string; actividad: string; tecnico: string; fecha: string; horaInicio: string; horaLiq?: string },
+    registradoPor: string,
+  ): Promise<WorkOrder> {
+    if (!ACTIVIDADES_PERMITIDAS.includes(dto.actividad.trim().toUpperCase())) {
+      throw new BadRequestException(`Actividad no reconocida: ${dto.actividad}`);
+    }
+    const externalNum = dto.numOrden.trim();
+    const horaIniAt = combinarFechaHoraHonduras(dto.fecha, dto.horaInicio);
+    const horaLiqAt = dto.horaLiq ? combinarFechaHoraHonduras(dto.fecha, dto.horaLiq) : null;
+
+    const fields = {
+      tenantId,
+      externalNum,
+      actividad: dto.actividad.trim().toUpperCase(),
+      tecnico: dto.tecnico.trim(),
+      estado: horaLiqAt ? 'CERRADA' : 'ASIGNADA',
+      fechaApe: horaIniAt,
+      horaIniAt,
+      horaLiqAt,
+      raw: {},
+      source: 'manual',
+      ingestedAt: new Date(),
+      registradoPor,
+    };
+
+    const existing = await this.orders.findOne({ where: { tenantId, externalNum } });
+    if (existing) {
+      return this.orders.save({ ...fields, id: existing.id });
+    }
+    return this.orders.save(fields);
+  }
+
+  /** Órdenes ingresadas manualmente (para el panel de "borrar una orden manual"). */
+  listOrdenesManuales(tenantId: string): Promise<WorkOrder[]> {
+    return this.orders.find({ where: { tenantId, source: 'manual' }, order: { ingestedAt: 'DESC' } });
+  }
+
+  /** Borra una orden manual — la versión real de Cepheus (si existe) vuelve a mostrarse. */
+  async borrarOrdenManual(tenantId: string, externalNum: string): Promise<void> {
+    const existing = await this.orders.findOne({ where: { tenantId, externalNum } });
+    if (!existing || existing.source !== 'manual') {
+      throw new NotFoundException('Orden manual no encontrada');
+    }
+    await this.orders.delete({ id: existing.id });
+  }
+
+  /**
+   * "Registrar Almuerzo": la ventana de almuerzo de un técnico en un día, para
+   * que el Gantt la muestre como un bloque aparte. Un técnico tiene como
+   * mucho un almuerzo por día (guardarlo de nuevo lo reemplaza).
+   */
+  async registrarAlmuerzo(
+    tenantId: string,
+    dto: { tecnico: string; fecha: string; horaInicio: string; horaFin: string },
+    registradoPor: string,
+  ): Promise<TechnicianLunch> {
+    const tecnico = dto.tecnico.trim();
+    const existing = await this.lunches.findOne({ where: { tenantId, tecnico, fecha: dto.fecha } });
+    const fields = {
+      tenantId,
+      tecnico,
+      fecha: dto.fecha,
+      horaInicioAt: combinarFechaHoraHonduras(dto.fecha, dto.horaInicio),
+      horaFinAt: combinarFechaHoraHonduras(dto.fecha, dto.horaFin),
+      registradoPor,
+    };
+    if (existing) {
+      return this.lunches.save({ ...fields, id: existing.id });
+    }
+    return this.lunches.save(fields);
+  }
+
+  /** Almuerzos registrados para un día calendario de Honduras (para el Gantt). */
+  getAlmuerzos(tenantId: string, fecha: string): Promise<TechnicianLunch[]> {
+    return this.lunches.find({ where: { tenantId, fecha }, order: { tecnico: 'ASC' } });
   }
 }

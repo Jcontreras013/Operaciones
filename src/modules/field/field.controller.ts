@@ -1,12 +1,14 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiSecurity, ApiTags } from '@nestjs/swagger';
-import { CurrentTenant } from '@common/tenant/current-tenant.decorator';
+import { CurrentTenant, CurrentUserId } from '@common/tenant/current-tenant.decorator';
 import { TENANT_AUTH } from '@common/swagger.constants';
 import { Roles } from '@common/auth/roles.decorator';
 import { RolesGuard } from '@common/auth/roles.guard';
 import { UserRole } from '@modules/tenancy/entities/user.entity';
 import { FieldIngestService } from './field-ingest.service';
 import { IngestDto } from './dto/ingest.dto';
+import { CreateManualWorkOrderDto } from './dto/create-manual-work-order.dto';
+import { RegistrarAlmuerzoDto } from './dto/registrar-almuerzo.dto';
 
 /**
  * Roles: mismo modelo que el monitor original (Admin/Jefe/Monitoreo/
@@ -87,6 +89,35 @@ export class FieldController {
     return this.ingest.getGantt(tenantId, dateStr);
   }
 
+  /**
+   * "Ingresar Orden Manual": para cuando la API de Cepheus falla y una orden
+   * real de un técnico no se refleja en el sistema. Mismo acceso que el
+   * original (es_admin_o_supervisor = Admin/Jefe). Declaradas ANTES de
+   * 'work-orders/:id' — si no, ':id' capturaría 'manual' como si fuera un id.
+   */
+  @Post('work-orders/manual')
+  @Roles(UserRole.ADMIN, UserRole.JEFE)
+  crearOrdenManual(
+    @CurrentTenant() tenantId: string,
+    @Body() dto: CreateManualWorkOrderDto,
+    @CurrentUserId() userId: string | undefined,
+  ) {
+    return this.ingest.crearOrdenManual(tenantId, dto, userId ?? 'desconocido');
+  }
+
+  @Get('work-orders/manual')
+  @Roles(UserRole.ADMIN, UserRole.JEFE)
+  listOrdenesManuales(@CurrentTenant() tenantId: string) {
+    return this.ingest.listOrdenesManuales(tenantId);
+  }
+
+  /** Borra una orden manual — la versión real de Cepheus (si existe) vuelve a mostrarse. */
+  @Delete('work-orders/manual/:externalNum')
+  @Roles(UserRole.ADMIN, UserRole.JEFE)
+  borrarOrdenManual(@CurrentTenant() tenantId: string, @Param('externalNum') externalNum: string) {
+    return this.ingest.borrarOrdenManual(tenantId, externalNum);
+  }
+
   @Get('work-orders/:id')
   @Roles(UserRole.ADMIN, UserRole.JEFE, UserRole.MONITOREO, UserRole.LLAMADOS)
   getWorkOrder(@CurrentTenant() tenantId: string, @Param('id', ParseUUIDPipe) id: string) {
@@ -104,5 +135,24 @@ export class FieldController {
   @Roles(UserRole.ADMIN, UserRole.JEFE)
   getReportes(@CurrentTenant() tenantId: string) {
     return this.ingest.getReportesBoard(tenantId);
+  }
+
+  /** "Registrar Almuerzo": la ventana de almuerzo de un técnico en un día. */
+  @Post('almuerzos')
+  @Roles(UserRole.ADMIN, UserRole.JEFE)
+  registrarAlmuerzo(
+    @CurrentTenant() tenantId: string,
+    @Body() dto: RegistrarAlmuerzoDto,
+    @CurrentUserId() userId: string | undefined,
+  ) {
+    return this.ingest.registrarAlmuerzo(tenantId, dto, userId ?? 'desconocido');
+  }
+
+  /** Almuerzos de un día calendario de Honduras (para el Gantt). */
+  @Get('almuerzos')
+  @Roles(UserRole.ADMIN, UserRole.JEFE, UserRole.MONITOREO)
+  getAlmuerzos(@CurrentTenant() tenantId: string, @Query('date') date?: string) {
+    const dateStr = date ?? new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' });
+    return this.ingest.getAlmuerzos(tenantId, dateStr);
   }
 }

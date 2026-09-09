@@ -5,6 +5,8 @@ import type { FieldBoard, GanttRow, IngestResult, WorkOrder } from '@/api/types'
 import { ErrorBox, Loading, PageHeader } from '@/components/ui';
 import { GanttChart } from '@/components/GanttChart';
 import { MultiSelect } from '@/components/MultiSelect';
+import { QuickActions } from '@/components/QuickActions';
+import { useAuth } from '@/auth/AuthContext';
 
 function estadoClass(estado: string | null): string {
   const e = (estado ?? '').toUpperCase();
@@ -22,6 +24,8 @@ function hoyHN(): string {
 
 export function MonitorPage() {
   const qc = useQueryClient();
+  const { role } = useAuth();
+  const esAdminOJefe = role === 'admin' || role === 'jefe';
   const [estado, setEstado] = useState<string[]>([]);
   const [actividad, setActividad] = useState<string[]>([]);
   const [motivo, setMotivo] = useState<string[]>([]);
@@ -54,13 +58,15 @@ export function MonitorPage() {
     queryFn: () => api<GanttRow[]>(`/v1/field/gantt?date=${fechaGantt}`),
   });
 
+  function invalidarTodo() {
+    qc.invalidateQueries({ queryKey: ['field-board'] });
+    qc.invalidateQueries({ queryKey: ['field-orders'] });
+    qc.invalidateQueries({ queryKey: ['field-gantt'] });
+  }
+
   const sync = useMutation({
     mutationFn: () => api<IngestResult>('/v1/field/ingest', { method: 'POST', body: {} }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['field-board'] });
-      qc.invalidateQueries({ queryKey: ['field-orders'] });
-      qc.invalidateQueries({ queryKey: ['field-gantt'] });
-    },
+    onSuccess: invalidarTodo,
   });
 
   const hayFiltroFecha = Boolean(fechaDesde || fechaHasta);
@@ -90,6 +96,8 @@ export function MonitorPage() {
           <b>{sync.data.updated}</b> actualizadas.
         </div>
       )}
+
+      {esAdminOJefe && <QuickActions onOrdenGuardada={invalidarTodo} />}
 
       {board.isLoading && <Loading />}
       {board.error && <ErrorBox message={(board.error as Error).message} />}

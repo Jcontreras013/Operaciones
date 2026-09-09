@@ -42,6 +42,7 @@ describe('FieldIngestService.ingest', () => {
       runRepo as never,
       new StubCepheusConnector(),
       dataSource as never,
+      {} as never,
     );
     return { service, runRepo, orderRepo };
   }
@@ -104,8 +105,9 @@ describe('FieldIngestService.getGantt', () => {
 
   function buildWithOrders(orders: Partial<Record<string, unknown>>[]) {
     const orderRepo = { find: jest.fn().mockResolvedValue(orders) };
-    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never);
-    return { service, orderRepo };
+    const lunchRepo = { find: jest.fn().mockResolvedValue([]) };
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, lunchRepo as never);
+    return { service, orderRepo, lunchRepo };
   }
 
   it('rechaza una fecha con formato inválido', async () => {
@@ -173,12 +175,32 @@ describe('FieldIngestService.getGantt', () => {
     const [row] = await service.getGantt(tenantId, '2020-01-01');
     expect(row.fin).toBe('2020-01-02T06:00:00.000Z'); // medianoche de Honduras
   });
+
+  it('incluye los almuerzos registrados ese día como bloques de actividad ALMUERZO', async () => {
+    const { service, lunchRepo } = buildWithOrders([
+      { tecnico: 'Norman', externalNum: 'ORD-1', horaIniAt: new Date('2026-09-09T12:00:00Z'), horaLiqAt: new Date('2026-09-09T13:00:00Z') },
+    ]);
+    lunchRepo.find.mockResolvedValue([
+      {
+        id: 'lunch-1',
+        tecnico: 'Norman',
+        horaInicioAt: new Date('2026-09-09T18:00:00Z'),
+        horaFinAt: new Date('2026-09-09T19:00:00Z'),
+      },
+    ]);
+    const rows = await service.getGantt(tenantId, '2026-09-09');
+    expect(rows).toHaveLength(2);
+    const almuerzo = rows.find((r) => r.actividad === 'ALMUERZO')!;
+    expect(almuerzo.tecnico).toBe('Norman');
+    expect(almuerzo.inicio).toBe('2026-09-09T18:00:00.000Z');
+    expect(almuerzo.fin).toBe('2026-09-09T19:00:00.000Z');
+  });
 });
 
 describe('FieldIngestService.listWorkOrders (filtro de fecha)', () => {
   it('sin from/to, limita a las 200 más recientes', async () => {
     const orderRepo = { find: jest.fn().mockResolvedValue([]) };
-    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never);
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
     await service.listWorkOrders('t1', {});
     const [opts] = orderRepo.find.mock.calls[0];
     expect(opts.take).toBe(200);
@@ -187,7 +209,7 @@ describe('FieldIngestService.listWorkOrders (filtro de fecha)', () => {
 
   it('con from/to, sube el límite a 500 y filtra por fechaApe', async () => {
     const orderRepo = { find: jest.fn().mockResolvedValue([]) };
-    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never);
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
     await service.listWorkOrders('t1', { from: '2026-09-01', to: '2026-09-05' });
     const [opts] = orderRepo.find.mock.calls[0];
     expect(opts.take).toBe(500);
@@ -196,7 +218,7 @@ describe('FieldIngestService.listWorkOrders (filtro de fecha)', () => {
 
   it('estado/actividad/motivo se pasan como In(...) para multiselección', async () => {
     const orderRepo = { find: jest.fn().mockResolvedValue([]) };
-    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never);
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
     await service.listWorkOrders('t1', { estado: ['ASIGNADA', 'CERRADA'], actividad: ['SOPFIBRA'], motivo: ['NIVELES'] });
     const [opts] = orderRepo.find.mock.calls[0];
     expect(opts.where.estado._value).toEqual(['ASIGNADA', 'CERRADA']);
@@ -212,7 +234,7 @@ describe('FieldIngestService.listWorkOrders (filtro de fecha)', () => {
         { actividad: 'SOPFIBRA', tecnico: '', esOffline: false, alertaTiempo: false },
       ]),
     };
-    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never);
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
 
     const criticas = await service.listWorkOrders('t1', { criticas: true });
     expect(criticas).toHaveLength(1);
@@ -238,7 +260,7 @@ describe('FieldIngestService.getReportesBoard', () => {
 
   function buildWithOrders(orders: Partial<Record<string, unknown>>[]) {
     const orderRepo = { find: jest.fn().mockResolvedValue(orders) };
-    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never);
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
     return { service, orderRepo };
   }
 
@@ -319,5 +341,169 @@ describe('FieldIngestService.getReportesBoard', () => {
       cerradasHoy: 0,
       pctHoy: 0,
     });
+  });
+});
+
+describe('FieldIngestService.crearOrdenManual / listOrdenesManuales / borrarOrdenManual', () => {
+  function buildOrderRepo(existing: Partial<Record<string, unknown>> | null = null) {
+    return {
+      findOne: jest.fn().mockResolvedValue(existing),
+      save: jest.fn((o: Record<string, unknown>) => Promise.resolve({ ...o, id: o.id ?? 'wo-nuevo' })),
+      find: jest.fn().mockResolvedValue([]),
+      delete: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+  }
+
+  it('rechaza una actividad que no está en la lista permitida', async () => {
+    const orderRepo = buildOrderRepo();
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
+    await expect(
+      service.crearOrdenManual(
+        't1',
+        { numOrden: '999', actividad: 'NO_EXISTE', tecnico: 'Norman', fecha: '2026-09-09', horaInicio: '08:00' },
+        'user-1',
+      ),
+    ).rejects.toThrow('Actividad no reconocida');
+  });
+
+  it('crea una orden manual ASIGNADA (sin horaLiq) con la hora en UTC de Honduras', async () => {
+    const orderRepo = buildOrderRepo();
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
+    const orden = await service.crearOrdenManual(
+      't1',
+      { numOrden: '999', actividad: 'sopfibra', tecnico: 'Norman Guardado', fecha: '2026-09-09', horaInicio: '08:00' },
+      'user-1',
+    );
+    expect(orden.estado).toBe('ASIGNADA');
+    expect(orden.actividad).toBe('SOPFIBRA');
+    expect(orden.source).toBe('manual');
+    expect(orden.registradoPor).toBe('user-1');
+    expect((orden.horaIniAt as Date).toISOString()).toBe('2026-09-09T14:00:00.000Z');
+    expect(orden.horaLiqAt).toBeNull();
+  });
+
+  it('crea una orden manual CERRADA cuando se da horaLiq', async () => {
+    const orderRepo = buildOrderRepo();
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
+    const orden = await service.crearOrdenManual(
+      't1',
+      { numOrden: '999', actividad: 'SOPFIBRA', tecnico: 'Norman', fecha: '2026-09-09', horaInicio: '08:00', horaLiq: '09:30' },
+      'user-1',
+    );
+    expect(orden.estado).toBe('CERRADA');
+    expect((orden.horaLiqAt as Date).toISOString()).toBe('2026-09-09T15:30:00.000Z');
+  });
+
+  it('reemplaza (no duplica) una orden manual existente con el mismo número', async () => {
+    const orderRepo = buildOrderRepo({ id: 'wo-existente', externalNum: '999' });
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
+    const orden = await service.crearOrdenManual(
+      't1',
+      { numOrden: '999', actividad: 'SOPFIBRA', tecnico: 'Norman', fecha: '2026-09-09', horaInicio: '08:00' },
+      'user-1',
+    );
+    expect(orden.id).toBe('wo-existente');
+  });
+
+  it('lista solo las órdenes con source manual', async () => {
+    const orderRepo = buildOrderRepo();
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
+    await service.listOrdenesManuales('t1');
+    expect(orderRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: 't1', source: 'manual' } }),
+    );
+  });
+
+  it('borrarOrdenManual rechaza si la orden no existe o no es manual', async () => {
+    const orderRepoNoExiste = buildOrderRepo(null);
+    const serviceNoExiste = new FieldIngestService(orderRepoNoExiste as never, {} as never, {} as never, {} as never, {} as never);
+    await expect(serviceNoExiste.borrarOrdenManual('t1', '999')).rejects.toThrow('Orden manual no encontrada');
+
+    const orderRepoReal = buildOrderRepo({ id: 'wo-1', externalNum: '999', source: 'cepheus' });
+    const serviceReal = new FieldIngestService(orderRepoReal as never, {} as never, {} as never, {} as never, {} as never);
+    await expect(serviceReal.borrarOrdenManual('t1', '999')).rejects.toThrow('Orden manual no encontrada');
+  });
+
+  it('borrarOrdenManual elimina una orden manual existente', async () => {
+    const orderRepo = buildOrderRepo({ id: 'wo-1', externalNum: '999', source: 'manual' });
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never, {} as never);
+    await service.borrarOrdenManual('t1', '999');
+    expect(orderRepo.delete).toHaveBeenCalledWith({ id: 'wo-1' });
+  });
+});
+
+describe('FieldIngestService.ingest (precedencia de órdenes manuales)', () => {
+  it('no sobrescribe una orden con source manual, aunque Cepheus reporte el mismo NUM', async () => {
+    const store = new Map<string, Record<string, unknown>>([
+      ['ORD-1001', { id: 'wo-manual', externalNum: 'ORD-1001', source: 'manual' }],
+    ]);
+    const orderRepo = {
+      findOne: jest.fn(({ where }: { where: { externalNum: string } }) =>
+        Promise.resolve(store.get(where.externalNum) ?? null),
+      ),
+      save: jest.fn((o: { externalNum: string; id?: string }) => {
+        const id = o.id ?? 'wo-' + o.externalNum;
+        store.set(o.externalNum, { ...o, id });
+        return Promise.resolve({ ...o, id });
+      }),
+    };
+    const runRepo = { save: jest.fn((r) => Promise.resolve({ ...r, id: 'run1' })) };
+    const dataSource = {
+      transaction: jest.fn((cb: (m: unknown) => unknown) => cb({ getRepository: () => orderRepo })),
+    };
+    const service = new FieldIngestService(
+      orderRepo as never,
+      runRepo as never,
+      new StubCepheusConnector(),
+      dataSource as never,
+      {} as never,
+    );
+
+    const res = await service.ingest('t1', new Date('2026-09-01'));
+    expect(store.get('ORD-1001')).toEqual(expect.objectContaining({ source: 'manual' }));
+    expect(res.created).toBe(6); // 7 de ejemplo, ORD-1001 se saltea
+  });
+});
+
+describe('FieldIngestService.registrarAlmuerzo / getAlmuerzos', () => {
+  function buildLunchRepo(existing: Partial<Record<string, unknown>> | null = null) {
+    return {
+      findOne: jest.fn().mockResolvedValue(existing),
+      save: jest.fn((o: Record<string, unknown>) => Promise.resolve({ ...o, id: o.id ?? 'lunch-nuevo' })),
+      find: jest.fn().mockResolvedValue([]),
+    };
+  }
+
+  it('registra un almuerzo nuevo con la hora en UTC de Honduras', async () => {
+    const lunchRepo = buildLunchRepo();
+    const service = new FieldIngestService({} as never, {} as never, {} as never, {} as never, lunchRepo as never);
+    const almuerzo = await service.registrarAlmuerzo(
+      't1',
+      { tecnico: 'Norman Guardado', fecha: '2026-09-09', horaInicio: '12:00', horaFin: '13:00' },
+      'user-1',
+    );
+    expect(almuerzo.horaInicioAt.toISOString()).toBe('2026-09-09T18:00:00.000Z');
+    expect(almuerzo.horaFinAt.toISOString()).toBe('2026-09-09T19:00:00.000Z');
+    expect(almuerzo.registradoPor).toBe('user-1');
+  });
+
+  it('reemplaza (no duplica) el almuerzo del mismo técnico y día', async () => {
+    const lunchRepo = buildLunchRepo({ id: 'lunch-existente' });
+    const service = new FieldIngestService({} as never, {} as never, {} as never, {} as never, lunchRepo as never);
+    const almuerzo = await service.registrarAlmuerzo(
+      't1',
+      { tecnico: 'Norman', fecha: '2026-09-09', horaInicio: '12:00', horaFin: '13:00' },
+      'user-1',
+    );
+    expect(almuerzo.id).toBe('lunch-existente');
+  });
+
+  it('getAlmuerzos consulta por tenantId + fecha', async () => {
+    const lunchRepo = buildLunchRepo();
+    const service = new FieldIngestService({} as never, {} as never, {} as never, {} as never, lunchRepo as never);
+    await service.getAlmuerzos('t1', '2026-09-09');
+    expect(lunchRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: 't1', fecha: '2026-09-09' } }),
+    );
   });
 });

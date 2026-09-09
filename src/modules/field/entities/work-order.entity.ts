@@ -129,4 +129,13 @@ export class WorkOrder extends TenantOwnedEntity {
 
   @Column({ type: 'timestamptz' })
   ingestedAt!: Date;
+
+  /**
+   * Usuario que ingresó la orden manualmente (solo cuando `source` es
+   * 'manual' — "Ingresar Orden Manual" del monitor, para cuando la API de
+   * Cepheus falla y una orden real no se refleja). Una orden manual GANA
+   * sobre la versión real del mismo NUM hasta que se borra explícitamente.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  registradoPor!: string | null;
 }
