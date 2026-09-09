@@ -20,3 +20,8 @@ export const CurrentUserId = createParamDecorator(
 export const CurrentUserRole = createParamDecorator(
   (_data: unknown, _ctx: ExecutionContext): string | undefined => TenantContext.getRole(),
 );
+
+/** Inyecta el login (email o nombre corto) del operador autenticado (o undefined). */
+export const CurrentUserEmail = createParamDecorator(
+  (_data: unknown, _ctx: ExecutionContext): string | undefined => TenantContext.getEmail(),
+);

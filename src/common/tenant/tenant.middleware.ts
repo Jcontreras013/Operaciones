@@ -22,7 +22,7 @@ export class TenantMiddleware implements NestMiddleware {
       throw new UnauthorizedException('Se requiere un token de operador');
     }
     TenantContext.run(
-      { tenantId: claims.tenantId, userId: claims.sub, role: claims.role },
+      { tenantId: claims.tenantId, userId: claims.sub, role: claims.role, email: claims.email },
       () => next(),
     );
   }

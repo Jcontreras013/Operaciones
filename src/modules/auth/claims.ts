@@ -8,6 +8,8 @@ export interface OperatorClaims {
   sub: string;
   tenantId: string;
   role: UserRole;
+  /** Login del usuario (email o nombre corto) — para reglas por persona (ej. acceso a Expedientes). */
+  email: string;
   typ: 'operator';
 }
 

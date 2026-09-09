@@ -8,9 +8,9 @@ describe('TokenService', () => {
   const tokens = new TokenService(jwt);
 
   it('firma y verifica un token de operador', () => {
-    const token = tokens.signOperator({ sub: 'u1', tenantId: 't1', role: UserRole.ADMIN });
+    const token = tokens.signOperator({ sub: 'u1', tenantId: 't1', role: UserRole.ADMIN, email: 'jaison' });
     const claims = tokens.verify(token);
-    expect(claims).toMatchObject({ sub: 'u1', tenantId: 't1', typ: 'operator', role: 'admin' });
+    expect(claims).toMatchObject({ sub: 'u1', tenantId: 't1', typ: 'operator', role: 'admin', email: 'jaison' });
   });
 
   it('firma y verifica un token de portal', () => {

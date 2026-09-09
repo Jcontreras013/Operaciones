@@ -11,8 +11,18 @@ const NAV = [
   { to: '/operations', label: 'Operaciones' },
 ];
 
+/**
+ * Acceso a Expedientes es por persona exacta, no por rol — igual que el
+ * backend (PersonnelRepoGuard). Ocultar el link evita mostrarle a todo el
+ * resto un ítem de menú que solo dice "no tienes acceso".
+ */
+const USUARIOS_EXPEDIENTES = new Set(['jaison', 'oscar', 'afajardo']);
+
 export function Layout() {
-  const { logout } = useAuth();
+  const { logout, email } = useAuth();
+  const nav = USUARIOS_EXPEDIENTES.has((email ?? '').trim().toLowerCase())
+    ? [...NAV, { to: '/expedientes', label: 'Expedientes' }]
+    : NAV;
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <aside
@@ -42,7 +52,7 @@ export function Layout() {
           </div>
         </div>
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {NAV.map((n) => (
+          {nav.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}

@@ -16,6 +16,8 @@ export interface TenantStore {
   userId?: string;
   /** Rol del usuario autenticado (del token). */
   role?: string;
+  /** Login (email o nombre corto) del usuario autenticado (del token). */
+  email?: string;
 }
 
 const storage = new AsyncLocalStorage<TenantStore>();
@@ -48,5 +50,10 @@ export const TenantContext = {
   /** Rol del operador autenticado, si está en el contexto. */
   getRole(): string | undefined {
     return storage.getStore()?.role;
+  },
+
+  /** Login (email o nombre corto) del operador autenticado, si está en el contexto. */
+  getEmail(): string | undefined {
+    return storage.getStore()?.email;
   },
 };
