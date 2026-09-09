@@ -1,15 +1,27 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { CurrentTenant, CurrentUserId } from '@common/tenant/current-tenant.decorator';
 import { TENANT_AUTH } from '@common/swagger.constants';
+import { Roles } from '@common/auth/roles.decorator';
+import { RolesGuard } from '@common/auth/roles.guard';
+import { UserRole } from '@modules/tenancy/entities/user.entity';
 import { QualityService } from './quality.service';
 import { CreateQualitySurveyDto } from './dto/create-quality-survey.dto';
 import { ResolveSeguimientoDto } from './dto/resolve-seguimiento.dto';
 import { ContactResult } from './entities/quality-survey.entity';
 
+/**
+ * Roles: Llamados es justamente quien hace esta gestión en el monitor
+ * original (pestaña "Registrar Gestión de Llamada"), así que entra a todo
+ * el módulo igual que Admin/Jefe/Monitoreo.
+ */
+const QUALITY_ROLES = [UserRole.ADMIN, UserRole.JEFE, UserRole.MONITOREO, UserRole.LLAMADOS];
+
 @ApiTags('Calidad (encuesta de control post-servicio)')
 @ApiSecurity(TENANT_AUTH)
 @Controller('v1/quality')
+@UseGuards(RolesGuard)
+@Roles(...QUALITY_ROLES)
 export class QualityController {
   constructor(private readonly quality: QualityService) {}
 

@@ -1,12 +1,24 @@
 import { Column, Entity, Index, Unique } from 'typeorm';
 import { TenantOwnedEntity } from '@common/database/base.entity';
 
-/** Roles del operador (E1). El acceso del cliente al portal es otra entidad. */
+/**
+ * Roles del operador (E1). El acceso del cliente al portal es otra entidad.
+ *
+ * ADMIN/OPS/FINANCE/READONLY son del 3PL general (Fase 0). JEFE/MONITOREO/
+ * LLAMADOS son específicos del dominio telecom migrado de monitor-operativo
+ * (Monitor/Red/Calidad — Fase D) y reflejan el modelo de roles que ya
+ * conocía el equipo ahí; se validan de verdad con `RolesGuard`
+ * (`@common/auth/roles.guard`), a diferencia de los cuatro genéricos, que
+ * hoy son solo metadata (ningún guard los exige todavía).
+ */
 export enum UserRole {
   ADMIN = 'admin',
   OPS = 'ops',
   FINANCE = 'finance',
   READONLY = 'readonly',
+  JEFE = 'jefe',
+  MONITOREO = 'monitoreo',
+  LLAMADOS = 'llamados',
 }
 
 @Entity('users')
