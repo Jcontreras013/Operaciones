@@ -6,10 +6,17 @@ import { CepheusConnector, RawOrder } from './cepheus-connector';
  * que la API real (claves en mayúsculas), para construir y probar la ingesta
  * sin depender de credenciales. Se reemplaza por el adaptador HTTP real.
  */
-/** Formatea a 'dd/mm/aaaa HH:MM', el formato que manda Cepheus para fechas/horas. */
+/**
+ * Formatea a 'dd/mm/aaaa HH:MM', el formato que manda Cepheus para fechas/
+ * horas — explícitamente en hora de Honduras (UTC-6), no la del proceso: el
+ * ingest interpreta estos strings como hora de Honduras (`parseFecha`), así
+ * que si se formatearan en la zona del servidor, "hace 3h" no cuadraría con
+ * el instante real al volver a parsearse.
+ */
 function fmt(d: Date): string {
+  const hn = new Date(d.getTime() - 6 * 60 * 60 * 1000);
   const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return `${p(hn.getUTCDate())}/${p(hn.getUTCMonth() + 1)}/${hn.getUTCFullYear()} ${p(hn.getUTCHours())}:${p(hn.getUTCMinutes())}`;
 }
 
 @Injectable()

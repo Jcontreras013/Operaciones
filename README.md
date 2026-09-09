@@ -168,7 +168,10 @@ Plan en [`docs/migracion-monitor-operativo.md`](./docs/migracion-monitor-operati
   [`.env.example`](./.env.example) — nunca en el repo, y nunca reutilizar credenciales que hayan
   estado expuestas en `monitor-operativo` (repo público: rotarlas en Cepheus/IT primero). Upsert
   idempotente por `NUM`, registro de corridas (`ingest_runs`, con estado `rate_limited` aparte de
-  `error`). Reemplaza al `sync_job.py` del monitor.
+  `error`). **`FieldIngestScheduler` corre la ingesta sola** (todos los tenants activos, cada hora
+  por defecto — `CEPHEUS_SYNC_CRON`/`CEPHEUS_SYNC_VENTANA_HORAS`), reemplazando al `sync_job.py` del
+  monitor: sin esto, una orden que sale de la ventana rodante de Cepheus antes de ingerirse manualmente
+  se pierde para siempre.
 - **Fase B — Monitor diario** (React, ruta `/monitor`): tablero con totales por estado/actividad/
   técnico, filtros y sincronización manual (`GET /v1/field/board`).
 - **Fase C — Offline y mapa OLT/PON** (React, ruta `/red`): detección de equipos de red caídos
@@ -186,6 +189,18 @@ Plan en [`docs/migracion-monitor-operativo.md`](./docs/migracion-monitor-operati
   qué mejorar). "Requiere seguimiento" es independiente del resultado de la llamada — ticket,
   responsable y fecha límite, con listado de pendientes y endpoint para resolverlos.
   `GET /v1/quality/report?days=` para el reporte completo.
+- **Gantt por técnico** (React, dentro de `/monitor`): línea de tiempo diaria — una franja por
+  orden trabajada, de `HORA_INI` a `HORA_LIQ` (o hasta ahora/fin del día si sigue abierta, con un
+  ancho mínimo de 15 min para que las visitas cortas se vean). Reemplaza el "Gantt en vivo"/"Gantt
+  Histórico" de `app.py`. `GET /v1/field/gantt?date=YYYY-MM-DD` (sin `date`, hoy en hora de
+  Honduras). El filtro de fecha (`from`/`to`) en la tabla de órdenes del Monitor permite navegar
+  cualquier día del histórico, no solo lo más reciente.
+
+**Zona horaria.** Cepheus reporta en hora de Honduras (UTC-6, sin horario de verano). Todo el
+parseo de fechas (`parseFecha`/`combineFechaHora` en `field-ingest.service.ts`) construye el
+instante UTC explícitamente con ese offset — no depende de la zona horaria del proceso (en
+producción es UTC). Antes de esto, `HORA_INI`/`HORA_LIQ`/`FECHA_APE` quedaban desfasados 6h
+(afectaba `ALERTA_TIEMPO`, el Gantt, y a qué día calendario pertenece cada orden).
 
 ### Roles y control de acceso (Monitor/Red/Calidad)
 
