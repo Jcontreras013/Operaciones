@@ -206,3 +206,53 @@ export interface GanttRow {
   inicio: string;
   fin: string;
 }
+
+// --- Centro de Reportes ---
+
+export type CategoriaRetraso = '>= 7 Dia' | '= 4 a 6 Dias' | '= 1 a 3 Dias' | '= 0 Dia';
+
+export interface ResumenRetrasoItem {
+  categoria: CategoriaRetraso;
+  cantidad: number;
+}
+
+export interface ConteoEtiqueta {
+  etiqueta: string;
+  cantidad: number;
+}
+
+export interface TableroDeCarga {
+  resumenRetraso: ResumenRetrasoItem[];
+  sop: ConteoEtiqueta[];
+  excedenDosHoras: number;
+  instalaciones: ConteoEtiqueta[];
+  plex: ConteoEtiqueta[];
+}
+
+export interface SegmentoStats {
+  totalGlobal: number;
+  cerradasGlobal: number;
+  pctGlobal: number;
+  totalMora: number;
+  cerradasMora: number;
+  pctMora: number;
+  totalHoy: number;
+  cerradasHoy: number;
+  pctHoy: number;
+}
+
+export interface ReportesBoard {
+  kpis: {
+    pendientesAsignadas: number;
+    cerradasHoy: number;
+    tecnicosEnRuta: number;
+    caidasOffline: number;
+    totalGeneral: number;
+  };
+  tablero: TableroDeCarga;
+  segmentos: {
+    residencial: SegmentoStats;
+    plex: SegmentoStats;
+    global: SegmentoStats;
+  };
+}

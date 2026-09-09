@@ -194,3 +194,100 @@ describe('FieldIngestService.listWorkOrders (filtro de fecha)', () => {
     expect(opts.where.fechaApe).toBeDefined();
   });
 });
+
+describe('FieldIngestService.getReportesBoard', () => {
+  const tenantId = 't1';
+  const ahora = new Date('2026-09-09T12:00:00Z'); // mediodía UTC = 06:00 en Honduras
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(ahora);
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  function buildWithOrders(orders: Partial<Record<string, unknown>>[]) {
+    const orderRepo = { find: jest.fn().mockResolvedValue(orders) };
+    const service = new FieldIngestService(orderRepo as never, {} as never, {} as never, {} as never);
+    return { service, orderRepo };
+  }
+
+  it('cuenta KPIs: pendientes asignadas, cerradas hoy, técnicos en ruta y caídas offline', async () => {
+    const { service } = buildWithOrders([
+      // pendiente asignada, en mora (3 días), sin offline
+      { estado: 'ASIGNADA', tecnico: 'Norman', actividad: 'SOPFIBRA', segmento: 'RESIDENCIAL', fechaApe: new Date('2026-09-06T12:00:00Z'), esOffline: false },
+      // pendiente asignada, del mismo técnico, offline
+      { estado: 'EN RUTA', tecnico: 'Norman', actividad: 'INSFIBRA', segmento: 'RESIDENCIAL', fechaApe: ahora, esOffline: true },
+      // cerrada hoy (Honduras), en mora al abrir, cuenta permitida
+      { estado: 'CERRADA', tecnico: 'Harin', actividad: 'SOPFIBRA', segmento: 'RESIDENCIAL', fechaApe: new Date('2026-09-04T12:00:00Z'), horaLiqAt: ahora },
+      // cerrada hoy, abierta hoy también, otro segmento
+      { estado: 'CERRADA', tecnico: 'Andres', actividad: 'INSFIBRA', segmento: 'PLEX', fechaApe: ahora, horaLiqAt: ahora },
+      // pendiente sin técnico pero actividad permitida: cuenta en total, no en asignadas
+      { estado: 'PENDIENTE', tecnico: '', actividad: 'SOPFIBRA', segmento: 'RESIDENCIAL', fechaApe: null },
+      // cerrada, pero actividad no permitida: no cuenta como cerradaHoy
+      { estado: 'CERRADA', tecnico: 'Miguel', actividad: 'NOPERMITIDA', segmento: 'RESIDENCIAL', horaLiqAt: ahora },
+    ]);
+
+    const board = await service.getReportesBoard(tenantId);
+
+    expect(board.kpis).toEqual({
+      pendientesAsignadas: 2,
+      cerradasHoy: 2,
+      tecnicosEnRuta: 1,
+      caidasOffline: 1,
+      totalGeneral: 3,
+    });
+  });
+
+  it('tablero de carga: agrupa por retraso y por SOP/Instalaciones/Plex', async () => {
+    const { service } = buildWithOrders([
+      { estado: 'ASIGNADA', tecnico: 'Norman', actividad: 'SOPFIBRA', fechaApe: new Date('2026-09-06T12:00:00Z') }, // 3 días
+      { estado: 'EN RUTA', tecnico: 'Norman', actividad: 'INSFIBRA', fechaApe: ahora }, // 0 días
+      { estado: 'PENDIENTE', tecnico: '', actividad: 'SOPFIBRA', fechaApe: null }, // 0 días, sin técnico
+      { estado: 'ASIGNADA', tecnico: 'Harin', actividad: 'PEXTERNO', fechaApe: ahora },
+    ]);
+
+    const board = await service.getReportesBoard(tenantId);
+
+    expect(board.tablero.resumenRetraso).toEqual([
+      { categoria: '>= 7 Dia', cantidad: 0 },
+      { categoria: '= 4 a 6 Dias', cantidad: 0 },
+      { categoria: '= 1 a 3 Dias', cantidad: 1 },
+      { categoria: '= 0 Dia', cantidad: 3 },
+    ]);
+    expect(board.tablero.sop).toEqual([{ etiqueta: 'FTTH / FIBRA', cantidad: 2 }]);
+    expect(board.tablero.instalaciones).toEqual([
+      { etiqueta: 'Nueva', cantidad: 1 },
+      { etiqueta: 'Adición', cantidad: 0 },
+      { etiqueta: 'Cambio / Migración', cantidad: 0 },
+      { etiqueta: 'Recuperado', cantidad: 0 },
+    ]);
+    expect(board.tablero.plex).toEqual([{ etiqueta: 'PEXTERNO', cantidad: 1 }]);
+    expect(board.tablero.excedenDosHoras).toBe(0);
+  });
+
+  it('consolidado por segmento: separa mora de hoy y calcula porcentajes de cierre', async () => {
+    const { service } = buildWithOrders([
+      // pendiente asignada RESIDENCIAL en mora (3 días)
+      { estado: 'ASIGNADA', tecnico: 'Norman', actividad: 'SOPFIBRA', segmento: 'RESIDENCIAL', fechaApe: new Date('2026-09-06T12:00:00Z') },
+      // pendiente asignada RESIDENCIAL de hoy
+      { estado: 'EN RUTA', tecnico: 'Norman', actividad: 'INSFIBRA', segmento: 'RESIDENCIAL', fechaApe: ahora },
+      // cerrada hoy, RESIDENCIAL, abierta en mora
+      { estado: 'CERRADA', tecnico: 'Harin', actividad: 'SOPFIBRA', segmento: 'RESIDENCIAL', fechaApe: new Date('2026-09-04T12:00:00Z'), horaLiqAt: ahora },
+    ]);
+
+    const board = await service.getReportesBoard(tenantId);
+
+    expect(board.segmentos.residencial).toEqual({
+      totalGlobal: 3,
+      cerradasGlobal: 1,
+      pctGlobal: (1 / 3) * 100,
+      totalMora: 2,
+      cerradasMora: 1,
+      pctMora: (1 / 2) * 100,
+      totalHoy: 1,
+      cerradasHoy: 0,
+      pctHoy: 0,
+    });
+  });
+});
