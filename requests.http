@@ -45,6 +45,19 @@ Authorization: Bearer {{token}}
   "password": "opspassword"
 }
 
+### 3b. Roles del dominio telecom (Monitor/Red/Calidad — ver tabla de acceso en README).
+### role: "jefe" | "monitoreo" | "llamados" (además de admin/ops/finance/readonly).
+POST {{baseUrl}}/v1/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "email": "supervisor@andina.com",
+  "name": "Nombre del supervisor",
+  "role": "jefe",
+  "password": "cambiar-esta-clave"
+}
+
 ### 4. Alta de cliente (dueño de la carga)
 POST {{baseUrl}}/v1/clients
 Content-Type: application/json

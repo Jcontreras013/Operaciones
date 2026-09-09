@@ -187,6 +187,25 @@ Plan en [`docs/migracion-monitor-operativo.md`](./docs/migracion-monitor-operati
   responsable y fecha límite, con listado de pendientes y endpoint para resolverlos.
   `GET /v1/quality/report?days=` para el reporte completo.
 
+### Roles y control de acceso (Monitor/Red/Calidad)
+
+`UserRole` (`src/modules/tenancy/entities/user.entity.ts`) agrega **JEFE**, **MONITOREO** y
+**LLAMADOS** a los cuatro genéricos del 3PL (admin/ops/finance/readonly), reflejando el modelo de
+roles que ya conocía el equipo en el monitor original. A diferencia de los genéricos (hoy solo
+metadata, ningún guard los exige), estos tres sí se validan de verdad con `RolesGuard`
+(`@common/auth/roles.guard` + `@Roles(...)`), aplicado en `FieldController` y `QualityController`:
+
+| Ruta | Admin | Jefe | Monitoreo | Llamados |
+|---|---|---|---|---|
+| `POST /v1/field/ingest` (forzar sincronización) | ✅ | — | — | — |
+| `GET /v1/field/board` (Monitor) | ✅ | ✅ | ✅ | — |
+| `GET /v1/field/work-orders*` (incluye buscador de Calidad) | ✅ | ✅ | ✅ | ✅ |
+| `GET /v1/field/offline`, `/ingest-runs` (Red / histórico) | ✅ | ✅ | — | — |
+| `/v1/quality/*` (Calidad completa) | ✅ | ✅ | ✅ | ✅ |
+
+Sin `@Roles(...)` en una ruta, `RolesGuard` no restringe nada — no hay superusuario implícito: si
+ADMIN debe entrar a una ruta, se lista explícitamente igual que los demás.
+
 Próximo: biometría, expedientes y vehículos (Fase E).
 
 ## Despliegue

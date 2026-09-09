@@ -44,4 +44,9 @@ export const TenantContext = {
   getUserId(): string | undefined {
     return storage.getStore()?.userId;
   },
+
+  /** Rol del operador autenticado, si está en el contexto. */
+  getRole(): string | undefined {
+    return storage.getStore()?.role;
+  },
 };
