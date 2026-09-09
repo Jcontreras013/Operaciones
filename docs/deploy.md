@@ -1,31 +1,32 @@
-# Despliegue — Render + Supabase
+# Despliegue — Render
 
 Arquitectura del despliegue:
 
-- **Supabase** → base de datos PostgreSQL gestionada.
-- **Render** → backend (API NestJS, servicio web Docker) + frontend (consola React, sitio estático).
+- **PostgreSQL de Render** — base ya creada a mano en el dashboard (`operaciones-db`), fuera del
+  Blueprint (así el Blueprint no intenta crear otra con el mismo nombre).
+- **Render** → backend (API NestJS, servicio web Docker) + frontend (consola React, sitio estático),
+  descritos en [`render.yaml`](../render.yaml) (Render Blueprint).
 
-Todo está descrito en [`render.yaml`](../render.yaml) (Render Blueprint). Los pasos manuales
-son crear las cuentas/proyectos y completar unas pocas variables secretas o dependientes de URL.
+Los pasos manuales son: crear la base (ya hecho), aplicar el Blueprint, y completar unas pocas
+variables secretas o dependientes de URL.
 
 ---
 
-## 1. Base de datos (PostgreSQL)
+## 1. Base de datos (ya creada)
 
-La app necesita un PostgreSQL estándar (conexión por `DATABASE_URL`). **Appwrite no sirve**
-(es un BaaS con API propia, no expone Postgres). Dos caminos:
+Si ya tienes `operaciones-db` en el dashboard de Render (New → PostgreSQL), anota estos dos datos
+de su pestaña **Info** → **Connections**:
 
-**Opción A — Postgres de Render (por defecto en `render.yaml`).** El Blueprint incluye un
-bloque `databases` que crea `operaciones-db` y cablea `DATABASE_URL` al backend
-automáticamente. No hay que copiar nada. Plan free: 1 GB (se borra a los ~30 días de inactividad).
+- **Region** (p. ej. Oregon) — `operaciones-api` debe crearse en la misma región.
+- **Internal Database URL** — úsala para `DATABASE_URL`, no la External: es más rápida (red
+  privada de Render, sin salir a internet) y no tiene costo de transferencia. La External sirve
+  para conectarte desde tu máquina (`psql`, un cliente de DB) durante troubleshooting.
 
-**Opción B — Postgres externo (Neon, Supabase, etc.).** Borra el bloque `databases` de
-`render.yaml` y define `DATABASE_URL` como `sync: false` en `operaciones-api`; pega la URI del
-proveedor en el panel. En Neon: crea el proyecto, copia la connection string (incluye
-`?sslmode=require`). En Supabase: usa la conexión **directa** `:5432`, no el pooler 6543.
-
-En cualquier caso, no hay que crear tablas ni extensiones a mano: la migración inicial hace
+No hay que crear tablas ni extensiones a mano: la migración inicial hace
 `CREATE EXTENSION IF NOT EXISTS "uuid-ossp"` y crea todo el esquema al arrancar el backend.
+
+¿Todavía no la creaste? **New → PostgreSQL** en Render, nómbrala `operaciones-db`, plan free (1 GB),
+la región que prefieras — solo asegúrate de crear `operaciones-api` en esa misma región después.
 
 ---
 
@@ -41,7 +42,7 @@ En cualquier caso, no hay que crear tablas ni extensiones a mano: la migración 
 
 | Variable | Valor |
 |----------|-------|
-| `DATABASE_URL` | la URI de Supabase del paso 1 (secreta) |
+| `DATABASE_URL` | **Internal Database URL** de `operaciones-db` (paso 1) |
 | `DATABASE_SSL` | `true` (ya en el Blueprint) |
 | `DATABASE_SYNCHRONIZE` | `false` (ya en el Blueprint) |
 | `DATABASE_MIGRATIONS_RUN` | `true` (ya en el Blueprint) — corre migraciones al arrancar |
@@ -72,10 +73,11 @@ Como cada servicio necesita la URL del otro, tras el primer deploy:
 El backend corre las migraciones pendientes **al arrancar** cuando
 `DATABASE_MIGRATIONS_RUN=true` (configurado en el Blueprint). No hay paso manual.
 
-Para correrlas a mano (local o CI) contra una base:
+Para correrlas a mano (local o CI) contra una base — usa la **External Database URL** si corres
+esto fuera de Render (tu máquina no tiene acceso a la red privada interna):
 
 ```bash
-export DATABASE_URL=postgresql://...   # y DATABASE_SSL=true si aplica
+export DATABASE_URL=postgresql://...   # External Database URL + DATABASE_SSL=true
 npm run build
 npm run migration:run
 ```
@@ -108,5 +110,11 @@ Luego entra al frontend (`https://operaciones-web.onrender.com`) con
 
 - **Plan free de Render:** el backend se "duerme" tras inactividad; el primer request tras
   dormir tarda unos segundos. Suficiente para demo/staging.
+- **Región:** `operaciones-api` y `operaciones-db` deben estar en la misma región — si no, la
+  Internal Database URL no resuelve y el backend no arranca (falla el healthcheck).
 - **Secretos:** nunca commitear `DATABASE_URL` ni `JWT_SECRET`; viven solo en el panel de Render.
 - **Rotar `JWT_SECRET`** invalida las sesiones existentes (obliga a re-login).
+- **Networking de la base:** por defecto Render permite conexiones entrantes desde cualquier IP
+  (`0.0.0.0/0`) a la External Database URL. Para producción, restringe las IP Restrictions de
+  `operaciones-db` a las que de verdad la usan (tu IP para troubleshooting; los servicios internos
+  de Render no la necesitan, usan la red privada).
