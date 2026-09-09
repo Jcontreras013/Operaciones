@@ -12,21 +12,24 @@ interface AuthState {
   isAuthenticated: boolean;
   /** Rol del operador (del token) — solo para ajustar la UI; el backend es quien realmente autoriza. */
   role: string | null;
+  /** Login (email o nombre corto) del operador (del token) — igual, solo UI. */
+  email: string | null;
   login: (input: LoginInput) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
-/** Lee el claim `role` de un JWT sin verificar la firma (uso puramente de UI). */
-function roleFromToken(token: string | null): string | null {
-  if (!token) return null;
+/** Lee los claims de un JWT sin verificar la firma (uso puramente de UI). */
+function claimsFromToken(token: string | null): { role: string | null; email: string | null } {
+  if (!token) return { role: null, email: null };
   try {
     const payload = token.split('.')[1];
     const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return (JSON.parse(json).role as string | undefined) ?? null;
+    const parsed = JSON.parse(json);
+    return { role: (parsed.role as string | undefined) ?? null, email: (parsed.email as string | undefined) ?? null };
   } catch {
-    return null;
+    return { role: null, email: null };
   }
 }
 
@@ -48,10 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokenState(null);
   }, []);
 
-  const value = useMemo<AuthState>(
-    () => ({ isAuthenticated: Boolean(token), role: roleFromToken(token), login, logout }),
-    [token, login, logout],
-  );
+  const value = useMemo<AuthState>(() => {
+    const claims = claimsFromToken(token);
+    return { isAuthenticated: Boolean(token), role: claims.role, email: claims.email, login, logout };
+  }, [token, login, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

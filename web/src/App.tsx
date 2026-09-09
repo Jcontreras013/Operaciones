@@ -7,6 +7,7 @@ import { MonitorPage } from '@/pages/MonitorPage';
 import { OfflinePage } from '@/pages/OfflinePage';
 import { ReportesPage } from '@/pages/ReportesPage';
 import { QualityPage } from '@/pages/QualityPage';
+import { ExpedientesPage } from '@/pages/ExpedientesPage';
 import { ClientsPage } from '@/pages/ClientsPage';
 import { OperationsPage } from '@/pages/OperationsPage';
 import { OperationDetailPage } from '@/pages/OperationDetailPage';
@@ -32,6 +33,7 @@ export function App() {
         <Route path="/red" element={<OfflinePage />} />
         <Route path="/reportes" element={<ReportesPage />} />
         <Route path="/calidad" element={<QualityPage />} />
+        <Route path="/expedientes" element={<ExpedientesPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/operations" element={<OperationsPage />} />
         <Route path="/operations/:id" element={<OperationDetailPage />} />

@@ -282,3 +282,16 @@ export interface ReportesBoard {
     global: SegmentoStats;
   };
 }
+
+// --- Personal (repositorio de documentos / Expedientes) ---
+
+export interface PersonnelDocument {
+  id: string;
+  colaborador: string;
+  nombreArchivo: string;
+  contentType: string | null;
+  tamanoBytes: number;
+  descripcion: string | null;
+  subidoPor: string;
+  createdAt: string;
+}

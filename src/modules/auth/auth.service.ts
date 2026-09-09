@@ -41,7 +41,7 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
     return {
-      accessToken: this.tokens.signOperator({ sub: user.id, tenantId: tenant.id, role: user.role }),
+      accessToken: this.tokens.signOperator({ sub: user.id, tenantId: tenant.id, role: user.role, email: user.email }),
       tokenType: 'Bearer',
     };
   }

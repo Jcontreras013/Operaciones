@@ -15,6 +15,7 @@ import { FieldModule } from '@modules/field/field.module';
 import { QualityModule } from '@modules/quality/quality.module';
 import { PortalModule } from '@modules/portal/portal.module';
 import { AuthModule } from '@modules/auth/auth.module';
+import { PersonnelModule } from '@modules/personnel/personnel.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -34,6 +35,7 @@ import { HealthController } from './health/health.controller';
     FieldModule,
     QualityModule,
     PortalModule,
+    PersonnelModule,
   ],
   controllers: [HealthController],
 })
