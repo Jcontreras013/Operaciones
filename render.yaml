@@ -1,18 +1,14 @@
 # Render Blueprint — despliega el backend (API) y el frontend (consola).
-# PostgreSQL gestionado por Render: DATABASE_URL se cablea solo al backend
-# (no hay que copiar cadena de conexión ni crear cuentas externas). Plan free:
-# 1 GB. Para migrar a un Postgres externo más adelante, basta cambiar
-# DATABASE_URL en el panel.
+# El Postgres NO lo crea este Blueprint: se usa uno ya existente (creado a
+# mano en el dashboard de Render, "New > PostgreSQL") — así evitamos que el
+# Blueprint intente crear otro con el mismo nombre. `DATABASE_URL` se pega a
+# mano (`sync: false`) con la **Internal Database URL** de esa base, una vez
+# creado `operaciones-api` en la MISMA región que la base (las URLs internas
+# de Render solo funcionan dentro de la misma región/red privada).
 #
-# Uso: en Render, New > Blueprint, apunta a este repositorio. Render crea la
-# base y los dos servicios. Solo completas las URLs (`sync: false`) tras el
-# primer deploy. Ver docs/deploy.md.
-
-databases:
-  - name: operaciones-db
-    plan: free
-    databaseName: operaciones
-    user: operaciones
+# Uso: en Render, New > Blueprint, apunta a este repositorio. Render propone
+# los dos servicios. Completas las variables `sync: false` tras el primer
+# deploy. Ver docs/deploy.md.
 
 services:
   # ---------------- Backend (NestJS) ----------------
@@ -21,14 +17,14 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
+    region: oregon # misma región que la base (operaciones-db) — obligatorio para la URL interna
     healthCheckPath: /health
     autoDeploy: true
     envVars:
-      # Cadena de conexión del Postgres de Render (cableada automáticamente).
+      # Pegar la "Internal Database URL" del Postgres ya creado (dashboard de
+      # Render → tu base → Connections). Debe estar en la misma región.
       - key: DATABASE_URL
-        fromDatabase:
-          name: operaciones-db
-          property: connectionString
+        sync: false
       - key: DATABASE_SSL
         value: 'true'
       - key: DATABASE_SYNCHRONIZE
