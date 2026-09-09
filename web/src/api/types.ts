@@ -75,8 +75,28 @@ export interface WorkOrder {
   pon: string | null;
   colonia: string | null;
   causa: string | null;
+  comentario: string | null;
   fechaApe: string | null;
   fechaApeRaw: string | null;
+  esOffline: boolean;
+  alertaTiempo: boolean;
+  causaOffline: string | null;
+}
+
+export interface OltPonRow {
+  olt: string;
+  pon: string;
+  total: number;
+  offline: number;
+}
+
+export interface OfflineBoard {
+  totalOffline: number;
+  totalAlertaTiempo: number;
+  porCausa: FieldGroup[];
+  porOlt: OltPonRow[];
+  porPon: OltPonRow[];
+  ordenes: WorkOrder[];
 }
 
 export interface FieldGroup {

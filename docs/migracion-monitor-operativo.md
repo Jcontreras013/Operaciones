@@ -91,13 +91,16 @@ El **frontend** agrega estas vistas a la consola React ya existente (mismo shell
 
 ## 5. Roadmap por fases
 
-- **Fase A — Ingesta + datos maestros (primer entregable).**
-  Módulo `field-ingest` que consume la API Cepheus y persiste órdenes/dispositivos en Postgres;
-  tablas de personal y GPS; un job programado. Entregable demostrable: "las órdenes del día ya
-  están en nuestra BD y consultables por API".
-- **Fase B — Monitor diario (React).** Vista de órdenes en tiempo real + pendientes + cerradas
-  por hora + NOINSTALADO, leyendo de Postgres. Es el reemplazo del uso diario.
-- **Fase C — Offline & Red (OLT/PON).** Diagnóstico de causa raíz y análisis de red.
+- ✅ **Fase A — Ingesta + datos maestros (primer entregable).**
+  Módulo `field-ingest` que consume la API Cepheus y persiste órdenes en Postgres; conector
+  enchufable (stub → HTTP real), upsert idempotente, registro de corridas. Entregable: "las
+  órdenes del día ya están en nuestra BD y consultables por API".
+- ✅ **Fase B — Monitor diario (React).** Tablero de órdenes por estado/actividad/técnico,
+  filtros y sincronización manual, leyendo de Postgres. Ruta `/monitor`.
+- ✅ **Fase C — Offline & Red (OLT/PON).** `ES_OFFLINE`/`ALERTA_TIEMPO` sobre soportes de fibra
+  abiertos, diagnóstico de causa raíz (con falsos positivos) sobre los ya cerrados, y mapa de
+  concentración de fallas por OLT/PON. Ruta `/red`; lógica portada de `tools.py` en
+  `src/modules/field/offline.ts`.
 - **Fase D — Calidad, auditoría, reportes.**
 - **Fase E — Biometría, expedientes/OCR, vehículos.**
 - **Fase F — Corte final** y apagado del Streamlit.

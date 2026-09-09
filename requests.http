@@ -423,9 +423,9 @@ Authorization: Bearer {{token}}
 
 { "reason": "Cliente ausente" }
 
-### --- CAMPO / MONITOR: INGESTA DE ÓRDENES (migración, Fase A) ---
+### --- CAMPO / MONITOR: INGESTA DE ÓRDENES (migración monitor-operativo) ---
 
-### F1. Disparar ingesta desde Cepheus (stub en Fase A). Idempotente.
+### F1. Disparar ingesta desde Cepheus (stub hasta tener credenciales reales). Idempotente.
 POST {{baseUrl}}/v1/field/ingest
 Content-Type: application/json
 Authorization: Bearer {{token}}
@@ -442,6 +442,18 @@ Authorization: Bearer {{token}}
 
 ### F4. Historial de corridas de ingesta
 GET {{baseUrl}}/v1/field/ingest-runs
+Authorization: Bearer {{token}}
+
+### F5. Tablero del Monitor (totales + agregados por estado/actividad/técnico) — Fase B
+GET {{baseUrl}}/v1/field/board
+Authorization: Bearer {{token}}
+
+### F6. Diagnóstico de offline: totales, causa raíz (30 días) y mapa de saturación OLT/PON — Fase C
+GET {{baseUrl}}/v1/field/offline
+Authorization: Bearer {{token}}
+
+### F6b. Mismo diagnóstico, ventana de causa raíz de 90 días
+GET {{baseUrl}}/v1/field/offline?days=90
 Authorization: Bearer {{token}}
 
 ### Health check (público)

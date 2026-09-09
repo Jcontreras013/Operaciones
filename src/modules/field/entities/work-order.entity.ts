@@ -86,6 +86,40 @@ export class WorkOrder extends TenantOwnedEntity {
   @Column({ type: 'varchar', nullable: true })
   horaLiq!: string | null;
 
+  /** HORA_INI combinada con su fecha (Date completa), para medir tiempos. */
+  @Column({ type: 'timestamptz', nullable: true })
+  horaIniAt!: Date | null;
+
+  /** HORA_LIQ combinada con su fecha (Date completa). */
+  @Column({ type: 'timestamptz', nullable: true })
+  horaLiqAt!: Date | null;
+
+  /** Razón de cierre que registró el técnico (diagnóstico de causa offline). */
+  @Column({ type: 'varchar', nullable: true })
+  razonCierreSop!: string | null;
+
+  /** Comentario de cierre del técnico (diagnóstico de causa offline). */
+  @Column({ type: 'varchar', nullable: true })
+  comentarioCierre!: string | null;
+
+  /** ¿Equipo de red caído? Calculado en la ingesta (ver field/offline.ts). */
+  @Index()
+  @Column({ default: false })
+  esOffline!: boolean;
+
+  /** ¿SOP abierta hace más de 2h sin liquidar? Calculado en la ingesta. */
+  @Column({ default: false })
+  alertaTiempo!: boolean;
+
+  /** Causa raíz clasificada a partir del cierre, solo cuando esOffline. */
+  @Index()
+  @Column({ type: 'varchar', nullable: true })
+  causaOffline!: string | null;
+
+  /** Palabras clave que dispararon `causaOffline` (para auditar el número). */
+  @Column({ type: 'varchar', nullable: true })
+  causaOfflineEvidencia!: string | null;
+
   /** Orden cruda completa (todas las columnas de Cepheus). */
   @Column('jsonb')
   raw!: Record<string, unknown>;
